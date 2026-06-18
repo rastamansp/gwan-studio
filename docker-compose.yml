@@ -1,0 +1,83 @@
+# Gwan Studio — stack de produção (Portainer).
+# Web app Django (Daphne ASGI: HTTP + WebSocket + estáticos via WhiteNoise) + worker Celery.
+# Deploy: Portainer UI -> Stacks -> gwan-studio (método Repository). NUNCA via SSH/docker compose up.
+#
+# Pré-requisitos no servidor:
+#   - rede externa gwan-network
+#   - Postgres (postgres.gwan.cloud), Redis (cache.gwan.cloud), MinIO (s3.gwan.cloud) compartilhados
+#   - DNS A: studio.gwan.cloud -> 187.127.5.72
+#   - Variáveis sensíveis preenchidas no Portainer (NÃO commitar segredos aqui)
+name: gwan-studio
+
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: gwan/studio-app:latest
+    container_name: gwan-studio-app
+    restart: unless-stopped
+    networks:
+      - gwan-network
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - PORT=3018
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=gwan-network"
+      # Web (HTTP + WebSocket) — studio.gwan.cloud
+      - "traefik.http.routers.studio.rule=Host(`${STUDIO_HOST:-studio.gwan.cloud}`)"
+      - "traefik.http.routers.studio.entrypoints=websecure"
+      - "traefik.http.routers.studio.tls.certresolver=letsencrypt"
+      - "traefik.http.services.studio.loadbalancer.server.port=3018"
+      # Redirect HTTP -> HTTPS
+      - "traefik.http.routers.studio-http.rule=Host(`${STUDIO_HOST:-studio.gwan.cloud}`)"
+      - "traefik.http.routers.studio-http.entrypoints=web"
+      - "traefik.http.routers.studio-http.middlewares=studio-https-redirect"
+      - "traefik.http.middlewares.studio-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.studio-https-redirect.redirectscheme.permanent=true"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:3018/api/health/').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Worker Celery (DESABILITADO até o Celery ser conectado) ──────────────
+  # O app Celery ainda não existe (falta config/celery.py + import em
+  # config/__init__.py + tasks reais; hoje os jobs são mock). Subir este serviço
+  # agora geraria crash-loop. Reabilitar quando a fila estiver implementada (Fase A).
+  #
+  # celery-worker:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   image: gwan/studio-app:latest
+  #   container_name: gwan-studio-worker
+  #   restart: unless-stopped
+  #   command: celery -A config worker --loglevel=info --concurrency=2
+  #   networks:
+  #     - gwan-network
+  #   env_file:
+  #     - path: .env
+  #       required: false
+  #   environment:
+  #     - DJANGO_SETTINGS_MODULE=config.settings.production
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+networks:
+  gwan-network:
+    external: true
+    name: gwan-network
