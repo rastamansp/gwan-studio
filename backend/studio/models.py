@@ -79,3 +79,26 @@ class JobModel(models.Model):
 
     def __str__(self):
         return f"{self.job_type} [{self.status}] — {self.project}"
+
+
+class ThumbnailModel(models.Model):
+    class Variant(models.TextChoices):
+        A = 'A', 'Variante A'
+        B = 'B', 'Variante B'
+        C = 'C', 'Variante C'
+
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project    = models.ForeignKey(ProjectModel, on_delete=models.CASCADE, related_name='thumbnails')
+    variant    = models.CharField(max_length=1, choices=Variant.choices)
+    plan       = models.JSONField(default=dict)
+    output_key = models.CharField(max_length=512, blank=True)
+    selected   = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('project', 'variant')]
+        ordering = ['variant']
+        db_table = 'studio_thumbnail'
+
+    def __str__(self):
+        return f"Thumbnail {self.variant} — {self.project}"

@@ -1,0 +1,70 @@
+{% comment %}F05 — geração em andamento; polling a cada 2s.{% endcomment %}
+<div class="space-y-5"
+     hx-get="/projects/{{ project.id }}/thumbnail/status/"
+     hx-trigger="every 2s"
+     hx-target="#step-content"
+     hx-swap="innerHTML">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Gerando Thumbnails</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">Claude Vision analisando frames…</p>
+    </div>
+    <span class="badge badge-secondary flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></span>
+      Executando
+    </span>
+  </div>
+
+  <div class="card px-4 py-5 space-y-4">
+    <!-- Steps -->
+    <div class="space-y-3">
+      <div class="flex items-center gap-3">
+        <div class="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+          <span class="w-3 h-3 rounded-full border-2 border-violet-500 border-t-transparent animate-spin"></span>
+        </div>
+        <p class="text-sm">Extraindo frames candidatos</p>
+      </div>
+      <div class="flex items-center gap-3 opacity-50">
+        <div class="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+          <span class="text-xs text-muted-foreground">2</span>
+        </div>
+        <p class="text-sm text-muted-foreground">Claude Vision analisando frames</p>
+      </div>
+      <div class="flex items-center gap-3 opacity-50">
+        <div class="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+          <span class="text-xs text-muted-foreground">3</span>
+        </div>
+        <p class="text-sm text-muted-foreground">Renderizando variantes A, B, C</p>
+      </div>
+    </div>
+
+    <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+      <div class="h-full bg-violet-500 rounded-full"
+           style="animation: indeterminate 1.5s ease-in-out infinite;"></div>
+    </div>
+  </div>
+
+  {% if job.logs %}
+  <div class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
+    {% for entry in job.logs %}
+    <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
+      {{ entry.text }}
+    </p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Export</button>
+    <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Próximo: SEO</button>
+  </div>
+</div>
+
+<style>
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(1);   }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}
+</style>

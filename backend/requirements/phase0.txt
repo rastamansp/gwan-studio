@@ -2,3 +2,6 @@
 Django==5.2.*
 django-htmx==1.*
 whitenoise[brotli]==6.*
+# F05
+Pillow==10.*
+anthropic==0.*

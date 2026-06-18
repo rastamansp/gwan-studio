@@ -1,0 +1,148 @@
+{% comment %}
+F05 — grid de 3 variantes com imagens reais + seleção.
+thumbnails: lista de dicts com variant, plan, has_image, selected
+{% endcomment %}
+<div class="space-y-5"
+     x-data="{
+       selected: '{{ selected.variant|default:'' }}',
+       loading: false,
+       select(variant) {
+         if (this.loading) return;
+         this.loading = true;
+         this.selected = variant;
+         const fd = new FormData();
+         fd.append('csrfmiddlewaretoken', document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? '');
+         fd.append('variant', variant);
+         fetch('/projects/{{ project.id }}/thumbnail/select/', { method: 'POST', body: fd })
+           .then(r => r.text())
+           .then(html => {
+             const t = document.getElementById('step-content');
+             if (t) { t.innerHTML = html; htmx.process(t); }
+           })
+           .finally(() => { this.loading = false; });
+       },
+     }">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Thumbnails Geradas</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">Selecione a variante para publicação</p>
+    </div>
+    <span class="badge badge-success">{{ thumbnails|length }} variante{{ thumbnails|length|pluralize:"s" }}</span>
+  </div>
+
+  <!-- Grid de variantes -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    {% for thumb in thumbnails %}
+    <div class="card cursor-pointer transition-all overflow-hidden group"
+         :class="selected === '{{ thumb.variant }}'
+           ? 'ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
+           : 'hover:shadow-md'"
+         @click="select('{{ thumb.variant }}')">
+
+      <!-- Thumbnail image ou fallback gradiente -->
+      <div class="aspect-video relative overflow-hidden select-none bg-muted">
+        {% if thumb.has_image %}
+        <img src="/projects/{{ project.id }}/thumbnail/image/{{ thumb.variant }}/"
+             alt="Thumbnail {{ thumb.variant }}"
+             class="w-full h-full object-cover"
+             loading="lazy">
+        {% else %}
+        <div class="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center">
+          <span class="text-4xl font-black text-zinc-600">{{ thumb.variant }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Selected badge -->
+        <div x-show="selected === '{{ thumb.variant }}'" x-cloak
+             class="absolute top-2 left-2 z-10">
+          <span class="badge badge-default" style="font-size:0.65rem;padding:0.15rem 0.5rem;gap:0.25rem">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-2.5 h-2.5">
+              <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
+            </svg>
+            Escolhida
+          </span>
+        </div>
+
+        <!-- Variant badge -->
+        <div class="absolute top-2 right-2 z-10">
+          <div class="w-6 h-6 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs font-bold flex items-center justify-center">
+            {{ thumb.variant }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-sm font-semibold">Variante {{ thumb.variant }}</span>
+          <span class="badge badge-secondary" style="font-size:0.65rem">
+            {{ thumb.plan.focus_area|default:"" }}
+          </span>
+        </div>
+        <p class="text-xs text-muted-foreground leading-snug line-clamp-2">
+          {{ thumb.plan.description|default:"" }}
+        </p>
+        {% if thumb.plan.text_overlay %}
+        <p class="text-xs font-mono text-foreground mt-1.5 truncate">"{{ thumb.plan.text_overlay }}"</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Selection status + confirm -->
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-muted-foreground">
+      {% if selected %}
+        Variante <span class="font-semibold text-foreground">{{ selected.variant }}</span> selecionada
+      {% else %}
+        <span x-show="selected" x-text="'Variante ' + selected + ' selecionada'" class="font-semibold text-foreground"></span>
+        <span x-show="!selected">Clique em uma variante para selecionar</span>
+      {% endif %}
+    </p>
+    <div class="flex items-center gap-2">
+      <!-- Regenerar -->
+      <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
+              :disabled="loading"
+              @click="
+                loading = true;
+                const fd = new FormData();
+                fd.append('csrfmiddlewaretoken', document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? '');
+                fetch('/projects/{{ project.id }}/thumbnail/generate/', { method: 'POST', body: fd })
+                  .then(r => r.text())
+                  .then(html => {
+                    const t = document.getElementById('step-content');
+                    if (t) { t.innerHTML = html; htmx.process(t); }
+                  })
+                  .finally(() => { loading = false; });
+              ">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+          <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08 1.977.75.75 0 01-1.448-.388A6 6 0 0113.058 4.58l.778.778V3.227a.75.75 0 01.75-.75z" clip-rule="evenodd"/>
+          <path fill-rule="evenodd" d="M2.164 13.523a.75.75 0 01-.75-.75V9.591a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.977l.84.841a4.5 4.5 0 007.08-1.977.75.75 0 111.448.388A6 6 0 012.943 11.42l-.778-.778v1.131a.75.75 0 01-.75.75z" clip-rule="evenodd"/>
+        </svg>
+        Regenerar
+      </button>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/export/"
+            hx-target="#step-content" hx-swap="innerHTML">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M9.78 11.78a.75.75 0 01-1.06 0L5.47 8.53a.75.75 0 010-1.06l3.25-3.25a.75.75 0 011.06 1.06L7.06 8l2.72 2.72a.75.75 0 010 1.06z" clip-rule="evenodd"/>
+      </svg>
+      Export
+    </button>
+    <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/seo/"
+            hx-target="#step-content" hx-swap="innerHTML">
+      Próximo: SEO
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+  </div>
+</div>

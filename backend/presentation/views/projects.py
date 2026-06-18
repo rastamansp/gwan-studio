@@ -594,13 +594,221 @@ def export_download(request, project_id):
     )
 
 
-def thumbnail_step(request, project_id):
+def _latest_thumbnail_job(project_id):
+    from studio.models import JobModel
+    return (
+        JobModel.objects
+        .filter(project_id=project_id, job_type='thumbnail')
+        .order_by('-created_at')
+        .first()
+    )
+
+
+def _list_thumbnails(project_id: str) -> list[dict]:
+    from studio.models import ThumbnailModel
+    return [
+        {
+            'id':         str(t.id),
+            'variant':    t.variant,
+            'plan':       t.plan,
+            'output_key': t.output_key,
+            'selected':   t.selected,
+            'has_image':  bool(t.output_key and os.path.exists(
+                os.path.join(settings.MEDIA_ROOT, t.output_key)
+            )),
+        }
+        for t in ThumbnailModel.objects.filter(project_id=project_id)
+    ]
+
+
+def _thumbnail_template_and_ctx(project_id: str) -> tuple[str, dict]:
     pd = _get_or_404(project_id)
-    extra = {'thumbnail_variants': _MOCK_THUMBNAILS}
+    job = _latest_thumbnail_job(project_id)
+    thumbnails = _list_thumbnails(project_id)
+
+    if job and job.status == 'running':
+        return 'thumbnail/_running.html', {'project': pd, 'job': _job_display(job)}
+
+    if job and job.status == 'done' and thumbnails:
+        return 'thumbnail/_result.html', {
+            'project': pd,
+            'thumbnails': thumbnails,
+            'selected': next((t for t in thumbnails if t['selected']), None),
+            'job': _job_display(job),
+        }
+
+    return 'thumbnail/_generator.html', {
+        'project': pd,
+        'job_error': job.error if job and job.status == 'failed' else None,
+    }
+
+
+def thumbnail_step(request, project_id):
+    template, extra = _thumbnail_template_and_ctx(project_id)
+    pd = extra['project']
     if request.htmx:
-        return render(request, 'thumbnail/_generator.html', {'project': pd, **extra})
-    ctx = _step_ctx(pd, 'thumbnail', {**extra, 'active_template': 'thumbnail/_generator.html'})
+        return render(request, template, extra)
+    ctx = _step_ctx(pd, 'thumbnail', {**extra, 'active_template': template})
     return render(request, 'projects/detail.html', ctx)
+
+
+def _simulated_plans(project_name: str) -> list[dict]:
+    name = project_name[:30]
+    return [
+        {
+            'variant': 'A',
+            'description': 'Frame dramático com texto de impacto e fundo vermelho intenso',
+            'text_overlay': name.upper(),
+            'color_palette': ['#dc2626', '#7f1d1d'],
+            'focus_area': 'action',
+            'font_style': 'bold',
+        },
+        {
+            'variant': 'B',
+            'description': 'Vista panorâmica com legenda limpa sobre fundo azul',
+            'text_overlay': name,
+            'color_palette': ['#1d4ed8', '#1e3a8a'],
+            'focus_area': 'landscape',
+            'font_style': 'clean',
+        },
+        {
+            'variant': 'C',
+            'description': 'Badge de conquista com destaque verde vibrante',
+            'text_overlay': f'✓ {name}',
+            'color_palette': ['#16a34a', '#14532d'],
+            'focus_area': 'face',
+            'font_style': 'dramatic',
+        },
+    ]
+
+
+def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
+    from studio.models import JobModel, ProjectModel, ThumbnailModel
+    from infrastructure.image.thumbnail_renderer import render_thumbnail
+    logs = []
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+
+        simulate = getattr(settings, 'THUMBNAIL_SIMULATE', True)
+
+        # Escolher vídeo de entrada
+        final_path  = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4')
+        merged_path = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'merged', 'merged.mp4')
+        video_path  = final_path if os.path.exists(final_path) else merged_path
+
+        if simulate:
+            plans = _simulated_plans(project_name)
+            logs.append({'text': '[SIMULADO] Planos gerados sem Claude Vision', 'type': 'info'})
+        else:
+            # Extração de frames
+            api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+            logs.append({'text': 'Extraindo 6 frames do vídeo…', 'type': 'info'})
+            from infrastructure.ffmpeg.frames import extract_frames
+            frames_b64 = extract_frames(video_path, n=6)
+            logs.append({'text': f'{len(frames_b64)} frames extraídos', 'type': 'success'})
+
+            logs.append({'text': 'Chamando Claude Vision para planejamento…', 'type': 'info'})
+            from infrastructure.ai.thumbnail_planner import plan_thumbnails
+            plans = plan_thumbnails(frames_b64, project_name, api_key=api_key)
+            logs.append({'text': '3 planos recebidos do Claude', 'type': 'success'})
+
+        # Deletar thumbnails anteriores
+        ThumbnailModel.objects.filter(project_id=project_id).delete()
+
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'thumbnails')
+        os.makedirs(output_dir, exist_ok=True)
+
+        for plan in plans:
+            variant = plan.get('variant', 'A')
+            out_filename = f'{variant}.jpg'
+            out_path = os.path.join(output_dir, out_filename)
+            render_thumbnail(plan, variant, out_path)
+            output_key = os.path.join('studio', project_id, 'thumbnails', out_filename)
+            ThumbnailModel.objects.create(
+                project_id=project_id,
+                variant=variant,
+                plan=plan,
+                output_key=output_key,
+            )
+            logs.append({'text': f'Thumbnail {variant} renderizada ({os.path.getsize(out_path)//1024} KB)', 'type': 'success'})
+
+        job.status = 'done'
+        job.logs = logs
+        job.result = {'variants': [p.get('variant') for p in plans]}
+        job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
+        ProjectModel.objects.filter(id=project_id).update(phase='thumbnails_done')
+
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error = str(exc)
+            job.logs = logs
+            job.save(update_fields=['status', 'error', 'logs', 'updated_at'])
+        except Exception:
+            pass
+
+
+def thumbnail_generate(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ProjectModel, JobModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    job = JobModel.objects.create(
+        project=project_obj,
+        job_type='thumbnail',
+        status='pending',
+    )
+    threading.Thread(
+        target=_run_thumbnail_job,
+        args=(str(job.id), project_id, project_obj.name),
+        daemon=True,
+    ).start()
+
+    pd = _get_or_404(project_id)
+    return render(request, 'thumbnail/_running.html', {
+        'project': pd,
+        'job': _job_display(job),
+    })
+
+
+def thumbnail_status(request, project_id):
+    template, ctx = _thumbnail_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def thumbnail_select(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ThumbnailModel
+    variant = request.POST.get('variant', '').strip().upper()
+    if variant not in ('A', 'B', 'C'):
+        return JsonResponse({'error': 'Variante inválida'}, status=400)
+
+    ThumbnailModel.objects.filter(project_id=project_id).update(selected=False)
+    ThumbnailModel.objects.filter(project_id=project_id, variant=variant).update(selected=True)
+
+    template, ctx = _thumbnail_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def thumbnail_image(request, project_id, variant):
+    from django.http import FileResponse
+    variant = variant.upper()
+    if variant not in ('A', 'B', 'C'):
+        raise Http404
+    path = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'thumbnails', f'{variant}.jpg')
+    if not os.path.exists(path):
+        raise Http404
+    return FileResponse(open(path, 'rb'), content_type='image/jpeg')
 
 
 def seo_step(request, project_id):
