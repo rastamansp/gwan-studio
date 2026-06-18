@@ -72,6 +72,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 MAX_SOURCE_MB = 2048   # 2 GB por arquivo
 ALLOWED_VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv']
 
+# F03 — merge
+MERGE_SIMULATE = True   # True = sem FFmpeg real (copia 1º source); False = usa ffmpeg do PATH
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'

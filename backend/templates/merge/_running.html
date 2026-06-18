@@ -1,0 +1,89 @@
+{% comment %}
+F03 — Estado de execução do merge. HTMX faz polling a cada 2s em merge/status/.
+{% endcomment %}
+<div class="space-y-5"
+     hx-get="/projects/{{ project.id }}/merge/status/"
+     hx-trigger="every 2s"
+     hx-target="#step-content"
+     hx-swap="innerHTML">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Merge em andamento</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">FFmpeg concatenando os clipes…</p>
+    </div>
+    <span class="badge badge-secondary flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+      Executando
+    </span>
+  </div>
+
+  <!-- Progress card -->
+  <div class="card px-4 py-5 space-y-3">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-4 h-4 text-primary animate-spin" style="animation-duration:2s">
+          <path d="M3 3.116a1.5 1.5 0 012.305-1.265l5.706 2.884a1.5 1.5 0 010 2.531L5.305 10.15A1.5 1.5 0 013 8.884V3.116z"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm font-medium">Mesclando {{ sources|length }} fonte{{ sources|length|pluralize:"s" }}</p>
+        <div class="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div class="h-full bg-primary rounded-full origin-left animate-[progress_3s_ease-in-out_infinite]"
+               style="width: 60%; animation: indeterminate 1.5s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log parcial (se houver) -->
+  {% if job.logs %}
+  <div class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
+    {% for entry in job.logs %}
+    <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'progress' %}text-blue-400{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
+      {{ entry.text }}
+    </p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Source list (readonly) -->
+  <div class="space-y-1.5">
+    {% for source in sources %}
+    <div class="card flex items-center gap-3 px-4 py-2.5 opacity-50">
+      <div class="w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center shrink-0">
+        {{ forloop.counter }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm truncate">{{ source.original_filename }}</p>
+      </div>
+      <span class="text-xs font-mono text-muted-foreground shrink-0">{{ source.duration_fmt }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Nav desabilitada durante o job -->
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-not-allowed opacity-40" disabled>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M9.78 11.78a.75.75 0 01-1.06 0L5.47 8.53a.75.75 0 010-1.06l3.25-3.25a.75.75 0 011.06 1.06L7.06 8l2.72 2.72a.75.75 0 010 1.06z" clip-rule="evenodd"/>
+      </svg>
+      Fontes
+    </button>
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-not-allowed opacity-40" disabled>
+      Próximo: Export
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<style>
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(1);   }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}
+</style>

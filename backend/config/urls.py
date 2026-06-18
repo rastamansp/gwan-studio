@@ -12,8 +12,10 @@ urlpatterns = [
     path('projects/<str:project_id>/sources/upload/', projects.upload_source, name='source-upload'),
     path('projects/<str:project_id>/sources/list/', projects.source_list_partial, name='source-list'),
     path('projects/<str:project_id>/sources/<str:source_id>/delete/', projects.delete_source, name='source-delete'),
-    # Pipeline steps
+    # Pipeline steps — Merge (F03)
     path('projects/<str:project_id>/merge/', projects.merge_step, name='merge-step'),
+    path('projects/<str:project_id>/merge/start/', projects.merge_start, name='merge-start'),
+    path('projects/<str:project_id>/merge/status/', projects.merge_status, name='merge-status'),
     path('projects/<str:project_id>/export/', projects.export_step, name='export-step'),
     path('projects/<str:project_id>/thumbnail/', projects.thumbnail_step, name='thumbnail-step'),
     path('projects/<str:project_id>/seo/', projects.seo_step, name='seo-step'),

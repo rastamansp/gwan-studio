@@ -1,8 +1,10 @@
 """
-Fase A — F01 + F02: Project CRUD + Source Upload.
+Fase A — F01 + F02 + F03: Project CRUD + Source Upload + Merge FFmpeg.
 """
 import json
+import os
 import subprocess
+import threading
 import uuid
 
 from django.conf import settings
@@ -10,7 +12,6 @@ from django.core.files.storage import default_storage
 from django.http import Http404, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
 
 from infrastructure.orm.repositories import DjangoProjectRepository
 
@@ -109,6 +110,19 @@ def _fmt_dt(dt) -> str:
     if delta.days == 1:
         return f"Ontem, {dt.astimezone().strftime('%H:%M')}"
     return f"{delta.days} dias atrás"
+
+
+def _log_type(line: str) -> str:
+    l = line.lower()
+    if any(k in l for k in ('error', 'invalid', 'failed', 'no such')):
+        return 'error'
+    if any(k in l for k in ('frame=', 'time=', 'speed=', 'bitrate=')):
+        return 'progress'
+    if any(k in l for k in ('muxing overhead', 'encoded', 'simulado', 'concluído')):
+        return 'success'
+    if 'upload' in l or 'minio' in l:
+        return 'upload'
+    return 'info'
 
 
 def _probe_duration(file_path: str) -> int:
@@ -249,14 +263,182 @@ def sources_step(request, project_id):
     return render(request, 'projects/detail.html', ctx)
 
 
-def merge_step(request, project_id):
+def _latest_merge_job(project_id):
+    from studio.models import JobModel
+    return (
+        JobModel.objects
+        .filter(project_id=project_id, job_type='merge')
+        .order_by('-created_at')
+        .first()
+    )
+
+
+def _job_display(job) -> dict:
+    return {
+        'id':     str(job.id),
+        'status': job.status,
+        'error':  job.error,
+        'logs':   job.logs or [],
+        'result': job.result or {},
+    }
+
+
+def _merge_template_and_ctx(project_id: str) -> tuple[str, dict]:
+    """Escolhe template + ctx extra com base no estado do último job de merge."""
     pd = _get_or_404(project_id)
     sources = _list_sources_display(project_id)
-    extra = {'sources': sources, 'job_logs': _MOCK_JOB_LOGS}
+    job = _latest_merge_job(project_id)
+
+    if job and job.status == 'running':
+        return 'merge/_running.html', {'project': pd, 'sources': sources, 'job': _job_display(job)}
+
+    if job and job.status == 'done':
+        result = job.result or {}
+        size_fmt = _fmt_size(result.get('size_bytes', 0))
+        total_dur = _total_duration(sources)
+        return 'merge/_result.html', {
+            'project': pd, 'sources': sources,
+            'job': _job_display(job),
+            'merged_size': size_fmt,
+            'merged_duration': total_dur,
+            'job_logs': job.logs or [],
+        }
+
+    # Nenhum job ou job failed → editor
+    return 'merge/_editor.html', {
+        'project': pd,
+        'sources': sources,
+        'sources_json': json.dumps([
+            {'id': s['id'], 'original_filename': s['original_filename'],
+             'camera': s['camera'], 'duration_fmt': s['duration_fmt'],
+             'size_fmt': s['size_fmt']}
+            for s in sources
+        ]),
+        'job_error': job.error if job and job.status == 'failed' else None,
+    }
+
+
+def merge_step(request, project_id):
+    template, extra = _merge_template_and_ctx(project_id)
+    pd = extra['project']
     if request.htmx:
-        return render(request, 'merge/_editor.html', {'project': pd, **extra})
-    ctx = _step_ctx(pd, 'merge', {**extra, 'active_template': 'merge/_editor.html'})
+        return render(request, template, extra)
+    ctx = _step_ctx(pd, 'merge', {**extra, 'active_template': template})
     return render(request, 'projects/detail.html', ctx)
+
+
+def _run_merge_job(job_id: str, source_paths: list[str], output_path: str) -> None:
+    """Executa no background thread — chama FFmpeg ou simula; atualiza JobModel."""
+    from studio.models import JobModel, ProjectModel
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+
+        simulate = getattr(settings, 'MERGE_SIMULATE', False)
+        if simulate:
+            from infrastructure.ffmpeg.merge import simulate_merge
+            log_lines = simulate_merge(source_paths, output_path)
+        else:
+            from infrastructure.ffmpeg.merge import run_ffmpeg_merge
+            log_lines = run_ffmpeg_merge(source_paths, output_path)
+
+        log_dicts = [{'text': l, 'type': _log_type(l)} for l in log_lines]
+        size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+
+        job.status = 'done'
+        job.logs = log_dicts
+        job.result = {'output_path': output_path, 'size_bytes': size_bytes}
+        job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
+
+        # Avança fase do projeto
+        ProjectModel.objects.filter(id=job.project_id).update(phase='merge_done')
+
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error = str(exc)
+            job.save(update_fields=['status', 'error', 'updated_at'])
+        except Exception:
+            pass
+
+
+def merge_start(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import SourceModel, JobModel, ProjectModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    # source_order: lista de IDs enviada pelo frontend (drag-drop)
+    raw_order = request.POST.get('source_order', '[]')
+    try:
+        source_order = json.loads(raw_order)
+    except (json.JSONDecodeError, ValueError):
+        source_order = []
+
+    # Buscar sources pelo projeto; respeitar ordem do frontend se fornecida
+    sources_qs = SourceModel.objects.filter(project=project_obj, status='ready')
+    if source_order:
+        id_index = {sid: i for i, sid in enumerate(source_order)}
+        sources = sorted(sources_qs, key=lambda s: id_index.get(str(s.id), 9999))
+    else:
+        sources = list(sources_qs.order_by('sort_order', 'created_at'))
+
+    if not sources:
+        # Sem sources — retorna editor com erro
+        template, ctx = 'merge/_editor.html', {
+            'project': _get_or_404(project_id),
+            'sources': [],
+            'sources_json': '[]',
+            'job_error': 'Adicione pelo menos uma fonte antes de fazer o merge.',
+        }
+        return render(request, template, ctx)
+
+    # Determinar caminhos absolutos dos sources
+    source_paths = []
+    for s in sources:
+        try:
+            source_paths.append(default_storage.path(s.storage_key))
+        except NotImplementedError:
+            pass  # S3 não suportado em phase0
+
+    output_dir = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'merged')
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'merged.mp4')
+
+    # Criar job
+    job = JobModel.objects.create(
+        project=project_obj,
+        job_type='merge',
+        status='pending',
+        source_order=[str(s.id) for s in sources],
+    )
+
+    # Disparar thread e retornar imediatamente com o template _running
+    t = threading.Thread(
+        target=_run_merge_job,
+        args=(str(job.id), source_paths, output_path),
+        daemon=True,
+    )
+    t.start()
+
+    pd = _get_or_404(project_id)
+    return render(request, 'merge/_running.html', {
+        'project': pd,
+        'sources': _list_sources_display(project_id),
+        'job': _job_display(job),
+    })
+
+
+def merge_status(request, project_id):
+    """Polling HTMX — retorna o template adequado ao estado atual do job."""
+    template, ctx = _merge_template_and_ctx(project_id)
+    return render(request, template, ctx)
 
 
 def export_step(request, project_id):

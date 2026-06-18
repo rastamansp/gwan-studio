@@ -46,3 +46,36 @@ class SourceModel(models.Model):
     class Meta:
         ordering = ['sort_order', 'created_at']
         db_table = 'studio_source'
+
+
+class JobModel(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Aguardando'
+        RUNNING = 'running', 'Executando'
+        DONE    = 'done',    'Concluído'
+        FAILED  = 'failed',  'Falhou'
+
+    class JobType(models.TextChoices):
+        MERGE     = 'merge',     'Merge'
+        EXPORT    = 'export',    'Export'
+        THUMBNAIL = 'thumbnail', 'Thumbnail'
+        SEO       = 'seo',       'SEO'
+        PUBLISH   = 'publish',   'Publicar'
+
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project      = models.ForeignKey(ProjectModel, on_delete=models.CASCADE, related_name='jobs')
+    job_type     = models.CharField(max_length=20, choices=JobType.choices)
+    status       = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    logs         = models.JSONField(default=list)
+    result       = models.JSONField(null=True, blank=True)
+    error        = models.TextField(blank=True)
+    source_order = models.JSONField(default=list)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        db_table = 'studio_job'
+
+    def __str__(self):
+        return f"{self.job_type} [{self.status}] — {self.project}"
