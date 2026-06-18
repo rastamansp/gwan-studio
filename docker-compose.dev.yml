@@ -23,7 +23,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6398:6379"  # slot 18 (6380+18) — evita colidir com Redis compartilhado (6379)
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -37,8 +37,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9018:9000"  # slot 18 — API S3 (evita colidir com MinIO compartilhado 9000)
+      - "9019:9001"  # slot 18 — console (evita colidir com 9001)
     volumes:
       - minio_data:/data
     healthcheck:

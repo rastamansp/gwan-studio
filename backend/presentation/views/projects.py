@@ -441,13 +441,157 @@ def merge_status(request, project_id):
     return render(request, template, ctx)
 
 
-def export_step(request, project_id):
+def _latest_export_job(project_id):
+    from studio.models import JobModel
+    return (
+        JobModel.objects
+        .filter(project_id=project_id, job_type='export')
+        .order_by('-created_at')
+        .first()
+    )
+
+
+def _export_template_and_ctx(project_id: str) -> tuple[str, dict]:
     pd = _get_or_404(project_id)
-    extra = {'job_logs': _MOCK_JOB_LOGS}
+    job = _latest_export_job(project_id)
+
+    if job and job.status == 'running':
+        return 'export/_running.html', {'project': pd, 'job': _job_display(job)}
+
+    if job and job.status == 'done':
+        result = job.result or {}
+        return 'export/_result.html', {
+            'project': pd,
+            'job':            _job_display(job),
+            'final_size':     _fmt_size(result.get('size_bytes', 0)),
+            'final_codec':    result.get('codec', 'copy'),
+            'final_res':      result.get('resolution', 'original'),
+            'final_bitrate':  result.get('bitrate', ''),
+            'job_logs':       job.logs or [],
+        }
+
+    return 'export/_settings.html', {
+        'project': pd,
+        'job_error': job.error if job and job.status == 'failed' else None,
+    }
+
+
+def export_step(request, project_id):
+    template, extra = _export_template_and_ctx(project_id)
+    pd = extra['project']
     if request.htmx:
-        return render(request, 'export/_settings.html', {'project': pd, **extra})
-    ctx = _step_ctx(pd, 'export', {**extra, 'active_template': 'export/_settings.html'})
+        return render(request, template, extra)
+    ctx = _step_ctx(pd, 'export', {**extra, 'active_template': template})
     return render(request, 'projects/detail.html', ctx)
+
+
+def _run_export_job(
+    job_id: str, merged_path: str, output_path: str,
+    codec: str, resolution: str, bitrate: str,
+) -> None:
+    from studio.models import JobModel, ProjectModel
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+
+        simulate = getattr(settings, 'EXPORT_SIMULATE', False)
+        if simulate:
+            from infrastructure.ffmpeg.export import simulate_export
+            log_lines = simulate_export(merged_path, output_path, codec, resolution, bitrate)
+        else:
+            from infrastructure.ffmpeg.export import run_ffmpeg_export
+            log_lines = run_ffmpeg_export(merged_path, output_path, codec, resolution, bitrate)
+
+        log_dicts = [{'text': l, 'type': _log_type(l)} for l in log_lines]
+        size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+
+        job.status = 'done'
+        job.logs = log_dicts
+        job.result = {
+            'output_path': output_path,
+            'size_bytes':  size_bytes,
+            'codec':       codec,
+            'resolution':  resolution,
+            'bitrate':     bitrate,
+        }
+        job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
+        ProjectModel.objects.filter(id=job.project_id).update(phase='export_done')
+
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error = str(exc)
+            job.save(update_fields=['status', 'error', 'updated_at'])
+        except Exception:
+            pass
+
+
+def export_start(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ProjectModel, JobModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    codec      = request.POST.get('codec', 'copy').strip()
+    resolution = request.POST.get('resolution', 'original').strip()
+    bitrate    = request.POST.get('bitrate', '').strip()
+
+    # Validar valores
+    if codec not in ('copy', 'h264', 'h265'):
+        codec = 'copy'
+
+    merged_path = os.path.join(
+        settings.MEDIA_ROOT, 'studio', project_id, 'merged', 'merged.mp4'
+    )
+    output_dir  = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final')
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'final.mp4')
+
+    job = JobModel.objects.create(
+        project=project_obj,
+        job_type='export',
+        status='pending',
+        result={'codec': codec, 'resolution': resolution, 'bitrate': bitrate},
+    )
+
+    t = threading.Thread(
+        target=_run_export_job,
+        args=(str(job.id), merged_path, output_path, codec, resolution, bitrate),
+        daemon=True,
+    )
+    t.start()
+
+    pd = _get_or_404(project_id)
+    return render(request, 'export/_running.html', {
+        'project': pd,
+        'job': _job_display(job),
+    })
+
+
+def export_status(request, project_id):
+    template, ctx = _export_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def export_download(request, project_id):
+    from django.http import FileResponse, Http404
+    output_path = os.path.join(
+        settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4'
+    )
+    if not os.path.exists(output_path):
+        raise Http404
+    return FileResponse(
+        open(output_path, 'rb'),
+        as_attachment=True,
+        filename='final.mp4',
+        content_type='video/mp4',
+    )
 
 
 def thumbnail_step(request, project_id):

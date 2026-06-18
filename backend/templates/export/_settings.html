@@ -1,86 +1,130 @@
-<div class="space-y-5" x-data="{ codec: 'copy', preset: 'original' }">
+{% comment %}
+F04 — Configuração do export com presets Alpine.js + submit real.
+{% endcomment %}
+<div class="space-y-5"
+     x-data="{
+       codec: 'copy',
+       resolution: 'original',
+       bitrate: '',
+       submitting: false,
+       setPreset(c, r, b) { this.codec = c; this.resolution = r; this.bitrate = b; },
+       getCsrf() {
+         const m = document.cookie.match(/csrftoken=([^;]+)/);
+         return m ? m[1] : '';
+       },
+       submit() {
+         if (this.submitting) return;
+         this.submitting = true;
+         const fd = new FormData();
+         fd.append('csrfmiddlewaretoken', this.getCsrf());
+         fd.append('codec',      this.codec);
+         fd.append('resolution', this.resolution);
+         fd.append('bitrate',    this.bitrate);
+         fetch('/projects/{{ project.id }}/export/start/', { method: 'POST', body: fd })
+           .then(r => r.text())
+           .then(html => {
+             const t = document.getElementById('step-content');
+             if (t) { t.innerHTML = html; htmx.process(t); }
+           })
+           .catch(() => { this.submitting = false; });
+       },
+     }">
+
+  <!-- Header -->
   <div class="flex items-center justify-between">
     <div>
       <h2 class="text-base font-semibold">Exportação Final</h2>
       <p class="text-sm text-muted-foreground mt-0.5">Configure codec, bitrate e resolução</p>
     </div>
-    <span class="badge badge-success">Export concluído</span>
+    <span class="badge badge-secondary">Aguardando export</span>
   </div>
+
+  {% if job_error %}
+  <div class="card border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive">
+    {{ job_error }}
+  </div>
+  {% endif %}
 
   <!-- Presets -->
   <div class="space-y-2">
-    <p class="label text-muted-foreground text-xs uppercase tracking-wide">Preset rápido</p>
+    <p class="text-xs text-muted-foreground uppercase tracking-wide">Preset rápido</p>
     <div class="flex flex-wrap gap-2">
-      <button class="btn btn-sm transition-all"
-              :class="preset==='original' ? 'btn-default' : 'btn-outline'"
-              @click="preset='original'; codec='copy'">
+      <button type="button" class="btn btn-sm transition-all"
+              :class="codec==='copy' ? 'btn-default' : 'btn-outline'"
+              @click="setPreset('copy','original','')">
         ⚡ Original (stream copy)
       </button>
-      <button class="btn btn-sm transition-all"
-              :class="preset==='4k' ? 'btn-default' : 'btn-outline'"
-              @click="preset='4k'; codec='h265'">
+      <button type="button" class="btn btn-sm transition-all"
+              :class="codec==='h265' && resolution==='4k' ? 'btn-default' : 'btn-outline'"
+              @click="setPreset('h265','4k','')">
         4K H.265
       </button>
-      <button class="btn btn-sm transition-all"
-              :class="preset==='fhd' ? 'btn-default' : 'btn-outline'"
-              @click="preset='fhd'; codec='h264'">
+      <button type="button" class="btn btn-sm transition-all"
+              :class="codec==='h264' && resolution==='fhd' ? 'btn-default' : 'btn-outline'"
+              @click="setPreset('h264','fhd','')">
         FHD H.264
       </button>
-      <button class="btn btn-sm transition-all"
-              :class="preset==='hd' ? 'btn-default' : 'btn-outline'"
-              @click="preset='hd'; codec='h264'">
+      <button type="button" class="btn btn-sm transition-all"
+              :class="codec==='h264' && resolution==='hd' ? 'btn-default' : 'btn-outline'"
+              @click="setPreset('h264','hd','')">
         HD 720p
       </button>
     </div>
   </div>
 
   <!-- Settings card -->
-  <div class="card">
-    <div class="card-content space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="space-y-1.5">
-          <label class="label text-xs">Codec de vídeo</label>
-          <select class="select" x-model="codec">
-            <option value="copy">Stream Copy — sem re-encode</option>
-            <option value="h264">H.264 / AVC</option>
-            <option value="h265">H.265 / HEVC</option>
-          </select>
-          <p class="text-xs text-muted-foreground" x-show="codec==='copy'">Preserva qualidade original — recomendado</p>
-          <p class="text-xs text-muted-foreground" x-show="codec==='h265'" x-cloak>Melhor compressão, mais lento</p>
-          <p class="text-xs text-muted-foreground" x-show="codec==='h264'" x-cloak>Compatibilidade máxima</p>
-        </div>
-        <div class="space-y-1.5">
-          <label class="label text-xs">Resolução</label>
-          <select class="select">
-            <option>Original — 3840×2160</option>
-            <option>1920×1080 (FHD)</option>
-            <option>1280×720 (HD)</option>
-          </select>
-        </div>
+  <div class="card px-4 py-4 space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Codec -->
+      <div class="space-y-1.5">
+        <label class="text-xs font-medium">Codec de vídeo</label>
+        <select class="select" x-model="codec">
+          <option value="copy">Stream Copy — sem re-encode</option>
+          <option value="h264">H.264 / AVC</option>
+          <option value="h265">H.265 / HEVC</option>
+        </select>
+        <p class="text-xs text-muted-foreground" x-show="codec==='copy'">Preserva qualidade original — recomendado</p>
+        <p class="text-xs text-muted-foreground" x-show="codec==='h265'" x-cloak>Melhor compressão, mais lento</p>
+        <p class="text-xs text-muted-foreground" x-show="codec==='h264'" x-cloak>Compatibilidade máxima</p>
       </div>
-
-      <div x-show="codec !== 'copy'" x-cloak class="space-y-1.5">
-        <label class="label text-xs">Bitrate de vídeo</label>
-        <div class="flex items-center gap-2">
-          <input type="text" class="input font-mono" style="width:7rem" value="0">
-          <span class="text-xs text-muted-foreground">0 = original &nbsp;·&nbsp; ex.: 8000k, 50M</span>
-        </div>
+      <!-- Resolução -->
+      <div class="space-y-1.5">
+        <label class="text-xs font-medium">Resolução</label>
+        <select class="select" x-model="resolution">
+          <option value="original">Original (sem escala)</option>
+          <option value="4k">4K — 3840×2160</option>
+          <option value="fhd">FHD — 1920×1080</option>
+          <option value="hd">HD — 1280×720</option>
+        </select>
       </div>
-
-      <button class="btn btn-default btn-sm gap-1.5"
-              hx-post="/projects/{{ project.id }}/export/start/"
-              hx-target="#step-content">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
-          <path d="M3 3.116a1.5 1.5 0 012.305-1.265l5.706 2.884a1.5 1.5 0 010 2.531L5.305 10.15A1.5 1.5 0 013 8.884V3.116z"/>
-        </svg>
-        Exportar
-      </button>
     </div>
+
+    <!-- Bitrate (apenas quando re-encode) -->
+    <div x-show="codec !== 'copy'" x-cloak class="space-y-1.5">
+      <label class="text-xs font-medium">Bitrate de vídeo</label>
+      <div class="flex items-center gap-2">
+        <input type="text" class="input font-mono" style="width:7rem"
+               placeholder="ex.: 8000k"
+               x-model="bitrate">
+        <span class="text-xs text-muted-foreground">vazio = manter original</span>
+      </div>
+    </div>
+
+    <!-- Botão exportar -->
+    <button type="button"
+            class="btn btn-default btn-sm gap-1.5"
+            :disabled="submitting"
+            :class="submitting ? 'opacity-50 cursor-wait' : ''"
+            @click="submit()">
+      <svg x-show="!submitting" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
+        <path d="M3 3.116a1.5 1.5 0 012.305-1.265l5.706 2.884a1.5 1.5 0 010 2.531L5.305 10.15A1.5 1.5 0 013 8.884V3.116z"/>
+      </svg>
+      <span x-show="submitting" class="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
+      <span x-text="submitting ? 'Iniciando...' : 'Exportar'"></span>
+    </button>
   </div>
 
-  {% include "components/_job_log.html" with logs=job_logs status="done" %}
-  {% include "export/_preview.html" %}
-
+  <!-- Nav -->
   <div class="flex items-center justify-between pt-2">
     <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
             hx-get="/projects/{{ project.id }}/merge/"
@@ -90,7 +134,7 @@
       </svg>
       Merge
     </button>
-    <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
             hx-get="/projects/{{ project.id }}/thumbnail/"
             hx-target="#step-content" hx-swap="innerHTML">
       Próximo: Thumbnails

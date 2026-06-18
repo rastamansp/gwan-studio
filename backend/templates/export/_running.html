@@ -1,0 +1,60 @@
+{% comment %}F04 — export em andamento; polling a cada 2s.{% endcomment %}
+<div class="space-y-5"
+     hx-get="/projects/{{ project.id }}/export/status/"
+     hx-trigger="every 2s"
+     hx-target="#step-content"
+     hx-swap="innerHTML">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Export em andamento</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">FFmpeg renderizando final.mp4…</p>
+    </div>
+    <span class="badge badge-secondary flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+      Executando
+    </span>
+  </div>
+
+  <div class="card px-4 py-5 space-y-3">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+             class="w-4 h-4 text-primary" style="animation: spin 2s linear infinite;">
+          <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm font-medium">Gerando final.mp4</p>
+        <div class="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div class="h-full bg-primary rounded-full"
+               style="width: 55%; animation: indeterminate 1.5s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if job.logs %}
+  <div class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
+    {% for entry in job.logs %}
+    <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'progress' %}text-blue-400{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
+      {{ entry.text }}
+    </p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Merge</button>
+    <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Próximo: Thumbnails</button>
+  </div>
+</div>
+
+<style>
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(1);   }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
