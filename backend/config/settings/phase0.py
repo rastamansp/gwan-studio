@@ -64,6 +64,14 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
+# Media (uploads locais na Fase 0 — MinIO na produção)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Upload limits
+MAX_SOURCE_MB = 2048   # 2 GB por arquivo
+ALLOWED_VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv']
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'

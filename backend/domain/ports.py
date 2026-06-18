@@ -29,7 +29,13 @@ class ISourceRepository(ABC):
     def save(self, source: Source) -> Source: ...
 
     @abstractmethod
+    def get(self, source_id: str) -> Source: ...
+
+    @abstractmethod
     def list_by_project(self, project_id: str) -> list[Source]: ...
+
+    @abstractmethod
+    def delete(self, source_id: str) -> None: ...
 
 
 class IJobRepository(ABC):

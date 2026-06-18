@@ -1,0 +1,46 @@
+{% if sources %}
+<div class="space-y-1.5" id="source-list-inner">
+  {% for source in sources %}
+  <div class="card flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors group"
+       id="source-{{ source.id }}">
+
+    <!-- Ícone câmera -->
+    <div class="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"
+           class="w-3.5 h-3.5 text-muted-foreground">
+        <path d="M2.5 3.5A1.5 1.5 0 001 5v6a1.5 1.5 0 001.5 1.5h7A1.5 1.5 0 0011 11V5a1.5 1.5 0 00-1.5-1.5h-7zm8.5.75a.75.75 0 00-1.28-.53l-2 2a.75.75 0 000 1.06l2 2A.75.75 0 0011 8.25V4.25z"/>
+      </svg>
+    </div>
+
+    <!-- Info -->
+    <div class="flex-1 min-w-0">
+      <p class="text-sm font-medium truncate">{{ source.original_filename }}</p>
+      <p class="text-xs text-muted-foreground mt-px font-mono flex items-center gap-1.5">
+        {% if source.camera != '—' %}<span>{{ source.camera }}</span><span class="opacity-40">·</span>{% endif %}
+        <span>{{ source.duration_fmt }}</span>
+        <span class="opacity-40">·</span>
+        <span>{{ source.size_fmt }}</span>
+        <span class="badge ml-1 {% if source.status == 'ready' %}badge-success{% elif source.status == 'error' %}badge-destructive{% else %}badge-secondary{% endif %}"
+              style="font-size:.6rem;padding:.05rem .4rem">{{ source.status }}</span>
+      </p>
+    </div>
+
+    <!-- Deletar -->
+    <button class="btn btn-ghost btn-icon btn-sm text-muted-foreground/20 hover:text-destructive hover:bg-destructive/10 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+            hx-post="/projects/{{ project.id }}/sources/{{ source.id }}/delete/"
+            hx-target="#source-list"
+            hx-swap="innerHTML"
+            hx-confirm="Remover {{ source.original_filename }}?"
+            title="Remover">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.3l.815 8.15A1.5 1.5 0 005.357 15h5.285a1.5 1.5 0 001.493-1.35l.815-8.15h.3a.75.75 0 000-1.5H11v-.75A2.25 2.25 0 008.75 1h-1.5A2.25 2.25 0 005 3.25zm2.25-.75a.75.75 0 00-.75.75V4h3v-.75a.75.75 0 00-.75-.75h-1.5zM6.05 6a.75.75 0 01.787.713l.275 5.5a.75.75 0 01-1.498.075l-.275-5.5A.75.75 0 016.05 6zm3.9 0a.75.75 0 01.712.787l-.275 5.5a.75.75 0 01-1.498-.075l.275-5.5a.75.75 0 01.786-.712z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8 text-sm text-muted-foreground" id="source-list-inner">
+  Nenhum arquivo enviado ainda.
+</div>
+{% endif %}

@@ -1,61 +1,73 @@
-<div class="space-y-5">
+<div class="space-y-5" x-data="sourceUploader('{{ project.id }}', {{ sources|length }})">
+
+  <!-- Header -->
   <div class="flex items-center justify-between">
     <div>
       <h2 class="text-base font-semibold">Fontes de Footage</h2>
-      <p class="text-sm text-muted-foreground mt-0.5">Clipes brutos do projeto</p>
+      <p class="text-sm text-muted-foreground mt-0.5">Clipes brutos para o projeto</p>
     </div>
-    {% if sources %}
-    <span class="badge badge-success">{{ sources|length }} arquivo{{ sources|length|pluralize:"s" }}</span>
-    {% endif %}
+    <span class="badge badge-success" x-show="totalCount > 0">
+      <span x-text="totalCount"></span> arquivo<span x-show="totalCount !== 1">s</span>
+    </span>
   </div>
 
   <!-- Dropzone -->
-  <label class="dropzone block p-8 text-center cursor-pointer group">
-    <div class="flex flex-col items-center gap-3">
-      <div class="w-12 h-12 rounded-xl bg-muted flex items-center justify-center group-hover:bg-accent transition-colors">
+  <label class="dropzone block p-8 text-center cursor-pointer group transition-colors"
+         :class="dragging ? 'border-primary bg-primary/5' : ''"
+         @dragover.prevent="dragging = true"
+         @dragleave.prevent="dragging = false"
+         @drop.prevent="dragging = false; handleDrop($event)">
+    <div class="flex flex-col items-center gap-3 pointer-events-none">
+      <div class="w-12 h-12 rounded-xl bg-muted flex items-center justify-center group-hover:bg-accent transition-colors"
+           :class="dragging ? 'bg-primary/10' : ''">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
              class="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors">
           <path d="M11.47 1.72a.75.75 0 011.06 0l3 3a.75.75 0 01-1.06 1.06l-1.72-1.72V7.5h-1.5V4.06L9.53 5.78a.75.75 0 01-1.06-1.06l3-3zM11.25 7.5V15a.75.75 0 001.5 0V7.5h3.75a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9a3 3 0 013-3h3.75z"/>
         </svg>
       </div>
       <div>
-        <p class="text-sm font-medium">
+        <p class="text-sm font-medium" x-show="!dragging">
           Arraste clipes ou <span class="text-primary underline underline-offset-4">clique para selecionar</span>
         </p>
-        <p class="text-xs text-muted-foreground mt-1">MP4 · MOV · MKV · Múltiplos arquivos · Máx 10 GB</p>
+        <p class="text-sm font-medium text-primary" x-show="dragging" x-cloak>Solte para enviar</p>
+        <p class="text-xs text-muted-foreground mt-1">MP4 · MOV · AVI · MKV · Múltiplos arquivos</p>
       </div>
     </div>
-    <input type="file" multiple accept="video/*" class="hidden">
+    <input type="file" multiple accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.mov,.avi,.mkv"
+           class="hidden" @change="handleFiles($event.target.files)">
   </label>
 
-  <!-- Source list -->
-  {% if sources %}
-  <div class="space-y-1.5" id="source-list">
-    {% for source in sources %}
-    <div class="card flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors">
-      <div class="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"
-             class="w-3.5 h-3.5 text-muted-foreground">
-          <path d="M2.5 3.5A1.5 1.5 0 001 5v6a1.5 1.5 0 001.5 1.5h7A1.5 1.5 0 0011 11V5a1.5 1.5 0 00-1.5-1.5h-7zm8.5.75a.75.75 0 00-1.28-.53l-2 2a.75.75 0 000 1.06l2 2A.75.75 0 0011 8.25V4.25z"/>
-        </svg>
-      </div>
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium truncate">{{ source.original_filename }}</p>
-        <p class="text-xs text-muted-foreground mt-px font-mono">
-          {{ source.camera }} · {{ source.duration_fmt }} · {{ source.file_size_mb }} GB
-          <span class="badge badge-success ml-1" style="font-size:0.6rem;padding:0.05rem 0.4rem">{{ source.status }}</span>
-        </p>
-      </div>
-      <button class="btn btn-ghost btn-icon btn-sm text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-md">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
-          <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.3l.815 8.15A1.5 1.5 0 005.357 15h5.285a1.5 1.5 0 001.493-1.35l.815-8.15h.3a.75.75 0 000-1.5H11v-.75A2.25 2.25 0 008.75 1h-1.5A2.25 2.25 0 005 3.25zm2.25-.75a.75.75 0 00-.75.75V4h3v-.75a.75.75 0 00-.75-.75h-1.5zM6.05 6a.75.75 0 01.787.713l.275 5.5a.75.75 0 01-1.498.075l-.275-5.5A.75.75 0 016.05 6zm3.9 0a.75.75 0 01.712.787l-.275 5.5a.75.75 0 01-1.498-.075l.275-5.5a.75.75 0 01.786-.712z" clip-rule="evenodd"/>
-        </svg>
-      </button>
+  <!-- Fila de upload (progress bars) -->
+  <template x-if="queue.length > 0">
+    <div class="space-y-2">
+      <p class="text-xs text-muted-foreground">Enviando...</p>
+      <template x-for="u in queue" :key="u.id">
+        <div class="card px-4 py-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-sm font-medium truncate flex-1" x-text="u.name"></p>
+            <span class="text-xs font-mono text-muted-foreground shrink-0" x-text="u.sizeFmt"></span>
+            <span class="badge shrink-0"
+                  :class="u.status === 'error' ? 'badge-destructive' : u.status === 'done' ? 'badge-success' : 'badge-secondary'"
+                  x-text="u.status === 'done' ? 'Enviado' : u.status === 'error' ? 'Erro' : u.progress + '%'">
+            </span>
+          </div>
+          <div class="h-1 w-full rounded-full bg-muted overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-200"
+                 :class="u.status === 'error' ? 'bg-destructive' : 'bg-primary'"
+                 :style="`width: ${u.progress}%`"></div>
+          </div>
+          <p class="text-xs text-destructive" x-show="u.error" x-text="u.error" x-cloak></p>
+        </div>
+      </template>
     </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+  </template>
 
+  <!-- Lista de sources (HTMX target) -->
+  <div id="source-list">
+    {% include "sources/_source_list.html" %}
+  </div>
+
+  <!-- Navegação -->
   <div class="flex justify-end pt-1">
     <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
             hx-get="/projects/{{ project.id }}/merge/"
@@ -68,3 +80,87 @@
     </button>
   </div>
 </div>
+
+<script>
+function sourceUploader(projectId, initialCount) {
+  return {
+    dragging: false,
+    queue: [],
+    totalCount: initialCount,
+
+    handleDrop(event) {
+      this.handleFiles(event.dataTransfer.files);
+    },
+
+    handleFiles(files) {
+      Array.from(files).forEach(file => this.uploadFile(file));
+    },
+
+    uploadFile(file) {
+      const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + Math.random();
+      const entry = {
+        id,
+        name: file.name,
+        sizeFmt: this.fmtSize(file.size),
+        progress: 0,
+        status: 'uploading',
+        error: null,
+      };
+      this.queue.push(entry);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('csrfmiddlewaretoken', this.getCsrf());
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          entry.progress = Math.round((e.loaded / e.total) * 95);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          entry.progress = 100;
+          entry.status = 'done';
+          this.totalCount++;
+          // Atualizar lista via HTMX
+          htmx.ajax('GET', `/projects/${projectId}/sources/list/`, {
+            target: '#source-list',
+            swap: 'innerHTML',
+          });
+          setTimeout(() => {
+            this.queue = this.queue.filter(u => u.id !== id);
+          }, 1500);
+        } else {
+          entry.status = 'error';
+          try {
+            entry.error = JSON.parse(xhr.responseText).error || 'Erro no upload';
+          } catch {
+            entry.error = 'Erro no upload';
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        entry.status = 'error';
+        entry.error = 'Falha na conexão';
+      });
+
+      xhr.open('POST', `/projects/${projectId}/sources/upload/`);
+      xhr.send(formData);
+    },
+
+    getCsrf() {
+      const m = document.cookie.match(/csrftoken=([^;]+)/);
+      return m ? m[1] : '';
+    },
+
+    fmtSize(bytes) {
+      const mb = bytes / (1024 * 1024);
+      return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+    },
+  };
+}
+</script>
