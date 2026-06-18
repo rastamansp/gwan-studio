@@ -13,7 +13,12 @@ COPY . .
 
 ENV DJANGO_SETTINGS_MODULE=config.settings.production
 
-RUN python manage.py collectstatic --noinput
+# collectstatic precisa importar os settings (que exigem SECRET_KEY/DATABASE_URL).
+# Valores dummy SO para o build (inline, nao persistem na imagem); em runtime o
+# compose/Portainer injeta os reais. collectstatic nao acessa o banco.
+RUN SECRET_KEY=build-only-not-a-secret \
+    DATABASE_URL=sqlite:////tmp/build.sqlite3 \
+    python manage.py collectstatic --noinput
 
 EXPOSE 3018
 

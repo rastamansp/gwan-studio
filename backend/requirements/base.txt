@@ -1,7 +1,7 @@
 # Fase A — dependências completas
 Django==5.2.*
 djangorestframework==3.*
-django-channels[daphne]==4.*
+channels[daphne]==4.*
 channels-redis==4.*
 celery[redis]==5.*
 django-celery-results==2.*
