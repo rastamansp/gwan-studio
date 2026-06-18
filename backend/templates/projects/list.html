@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Projetos — Gwan Studio{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">Projetos</h1>
+    <p class="text-sm text-muted-foreground mt-1">{{ projects|length }} projeto{{ projects|length|pluralize:"s" }} no canal</p>
+  </div>
+  <button class="btn btn-default btn-sm" onclick="document.getElementById('modal-new').showModal()">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+      <path d="M8.75 3.75a.75.75 0 00-1.5 0v3.5h-3.5a.75.75 0 000 1.5h3.5v3.5a.75.75 0 001.5 0v-3.5h3.5a.75.75 0 000-1.5h-3.5v-3.5z"/>
+    </svg>
+    Novo Projeto
+  </button>
+</div>
+
+<div class="space-y-2">
+  {% for project in projects %}
+  <a href="/projects/{{ project.id }}/"
+     class="card flex items-center gap-4 px-5 py-4 hover:bg-accent/40 transition-colors cursor-pointer group block">
+
+    <!-- Ícone -->
+    <div class="w-10 h-10 rounded-md brand-gradient flex items-center justify-center shrink-0 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" class="w-4.5 h-4.5" style="width:1.125rem;height:1.125rem">
+        <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
+      </svg>
+    </div>
+
+    <!-- Info -->
+    <div class="flex-1 min-w-0">
+      <p class="font-medium text-sm truncate">{{ project.name }}</p>
+      <div class="flex items-center gap-2.5 mt-0.5">
+        <span class="text-xs text-muted-foreground flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3 text-red-400">
+            <path d="M4.918 1.636A.75.75 0 014 2.4v7.2a.75.75 0 001.164.506l4.5-3.6a.75.75 0 000-1.012l-4.5-3.6a.75.75 0 00-.246-.258z"/>
+          </svg>
+          {{ project.channel_name }}
+        </span>
+        {% if project.sources_count > 0 %}
+        <span class="text-xs text-muted-foreground">·</span>
+        <span class="text-xs text-muted-foreground">{{ project.sources_count }} clips · {{ project.total_duration }}</span>
+        {% endif %}
+        <span class="text-xs text-muted-foreground hidden sm:inline">· {{ project.updated_at }}</span>
+      </div>
+    </div>
+
+    <!-- Badge + chevron -->
+    <div class="flex items-center gap-3 shrink-0">
+      <span class="badge badge-{{ project.phase_color }}">{{ project.phase_label }}</span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"
+           class="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+  </a>
+  {% empty %}
+  <div class="text-center py-20">
+    <div class="w-12 h-12 rounded-xl brand-gradient flex items-center justify-center mx-auto mb-4 opacity-25">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" class="w-6 h-6">
+        <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
+      </svg>
+    </div>
+    <p class="font-medium text-sm">Nenhum projeto ainda</p>
+    <p class="text-sm text-muted-foreground mt-1">Crie seu primeiro projeto de vídeo</p>
+    <button class="btn btn-default btn-sm mt-5" onclick="document.getElementById('modal-new').showModal()">
+      Criar projeto
+    </button>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Modal novo projeto -->
+<dialog id="modal-new">
+  <div class="p-6">
+    <div class="mb-5">
+      <h2 class="card-title">Novo Projeto</h2>
+      <p class="card-description mt-1">Crie um projeto de vídeo para YouTube</p>
+    </div>
+    <form method="post" action="/projects/new/" class="space-y-4">
+      {% csrf_token %}
+      <div class="space-y-1.5">
+        <label class="label" for="name">Nome do projeto</label>
+        <input id="name" type="text" name="name" class="input"
+               placeholder="Pedalada 200km — Serra Gaúcha" autofocus>
+      </div>
+      <div class="space-y-1.5">
+        <label class="label" for="channel">Canal YouTube</label>
+        <input id="channel" type="text" name="channel_name" class="input" placeholder="@seucanal">
+      </div>
+      <div class="flex items-center justify-end gap-2 mt-6">
+        <button type="button" class="btn btn-ghost btn-sm"
+                onclick="document.getElementById('modal-new').close()">
+          Cancelar
+        </button>
+        <button type="submit" class="btn btn-default btn-sm">Criar projeto</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script>
+  document.getElementById('modal-new').addEventListener('click', function(e) {
+    if (e.target === this) this.close();
+  });
+</script>
+{% endblock %}

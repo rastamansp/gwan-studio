@@ -1,0 +1,19 @@
+# Fase A — dependências completas
+Django==5.2.*
+djangorestframework==3.*
+django-channels[daphne]==4.*
+channels-redis==4.*
+celery[redis]==5.*
+django-celery-results==2.*
+dj-database-url==2.*
+psycopg[binary]==3.*
+boto3==1.*
+anthropic==0.*
+google-api-python-client==2.*
+google-auth-oauthlib==1.*
+ffmpeg-python==0.2.*
+Pillow==10.*
+cryptography==42.*
+python-decouple==3.*
+django-htmx==1.*
+whitenoise[brotli]==6.*

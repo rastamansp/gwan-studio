@@ -1,0 +1,107 @@
+<div class="space-y-3" x-data="{
+  approved: false,
+  title: '{{ seo.title|escapejs }}',
+  get titleLen() { return this.title.length },
+  get titleOk() { return this.titleLen >= 40 && this.titleLen <= 100 }
+}">
+
+  <!-- Title -->
+  <div class="card">
+    <div class="card-header">
+      <div class="flex items-center justify-between">
+        <label class="label text-xs uppercase tracking-wide text-muted-foreground">Título</label>
+        <span class="text-xs font-mono"
+              :class="titleOk ? 'text-green-600 dark:text-green-400' : titleLen > 100 ? 'text-destructive' : 'text-yellow-600 dark:text-yellow-400'">
+          <span x-text="titleLen"></span>/100
+        </span>
+      </div>
+    </div>
+    <div class="card-content pt-0 space-y-1.5">
+      <input type="text" class="input font-medium" x-model="title" value="{{ seo.title }}">
+      <p class="text-xs" :class="titleOk ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'">
+        <span x-show="titleOk" x-cloak>✓ Comprimento ideal para YouTube (40–100 chars)</span>
+        <span x-show="!titleOk">Ideal: 40–100 caracteres</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Description -->
+  <div class="card">
+    <div class="card-header">
+      <div class="flex items-center justify-between">
+        <label class="label text-xs uppercase tracking-wide text-muted-foreground">Descrição</label>
+        <span class="text-xs text-muted-foreground">Máx. 5000 chars</span>
+      </div>
+    </div>
+    <div class="card-content pt-0">
+      <textarea class="textarea font-mono text-xs leading-relaxed" style="min-height:10rem">{{ seo.description }}</textarea>
+    </div>
+  </div>
+
+  <!-- Tags -->
+  <div class="card">
+    <div class="card-header">
+      <div class="flex items-center justify-between">
+        <label class="label text-xs uppercase tracking-wide text-muted-foreground">Tags</label>
+        <span class="text-xs text-muted-foreground">{{ seo.tags|length }} tags</span>
+      </div>
+    </div>
+    <div class="card-content pt-0 space-y-2">
+      <div class="flex flex-wrap gap-1.5">
+        {% for tag in seo.tags %}
+        <span class="badge badge-secondary gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors">
+          {{ tag }}
+          <button class="text-muted-foreground/50 hover:text-destructive leading-none">×</button>
+        </span>
+        {% endfor %}
+      </div>
+      <input type="text" class="input font-mono text-xs"
+             placeholder="nova-tag (Enter para adicionar)">
+    </div>
+  </div>
+
+  <!-- Quality score -->
+  <div class="card">
+    <div class="card-content">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Qualidade SEO</p>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-muted-foreground">Título (40–100 chars)</span>
+          <span :class="titleOk ? 'text-green-600 dark:text-green-400 font-medium' : 'text-yellow-600'">
+            <span x-show="titleOk" x-cloak>✓ Ótimo</span>
+            <span x-show="!titleOk">Ajustar</span>
+          </span>
+        </div>
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-muted-foreground">Descrição com capítulos</span>
+          <span class="text-green-600 dark:text-green-400 font-medium">✓ Ótimo</span>
+        </div>
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-muted-foreground">Tags (5–15)</span>
+          <span class="text-green-600 dark:text-green-400 font-medium">✓ {{ seo.tags|length }} tags</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approve -->
+  <div class="flex items-center justify-between">
+    <div>
+      <div x-show="approved" x-cloak class="flex items-center gap-1.5 text-green-600 dark:text-green-400 text-sm font-medium">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+          <path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 01.208 1.04l-5 7.5a.75.75 0 01-1.154.114l-3-3a.75.75 0 011.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 011.04-.207z" clip-rule="evenodd"/>
+        </svg>
+        SEO aprovado
+      </div>
+      <p x-show="!approved" class="text-xs text-muted-foreground">Revise e aprove para continuar</p>
+    </div>
+    <button class="btn btn-sm gap-1.5"
+            :class="approved ? 'btn-outline' : 'btn-success'"
+            @click="approved = true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
+        <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
+      </svg>
+      <span x-text="approved ? 'Aprovado!' : 'Aprovar SEO'"></span>
+    </button>
+  </div>
+</div>

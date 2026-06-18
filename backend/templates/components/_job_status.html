@@ -1,0 +1,15 @@
+<div class="flex items-center gap-2">
+  {% if status == "pending" %}
+    <span class="loading loading-ring loading-sm text-base-content/30"></span>
+    <span class="text-sm text-base-content/50">Aguardando...</span>
+  {% elif status == "running" %}
+    <span class="loading loading-spinner loading-sm text-warning"></span>
+    <span class="text-sm text-warning font-medium">Processando...</span>
+  {% elif status == "done" %}
+    <span class="text-success font-bold">✓</span>
+    <span class="text-sm text-success font-medium">Concluído</span>
+  {% elif status == "failed" %}
+    <span class="text-error font-bold">✕</span>
+    <span class="text-sm text-error font-medium">Falhou</span>
+  {% endif %}
+</div>

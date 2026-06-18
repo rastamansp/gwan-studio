@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Gwan Studio{% endblock %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-5">
+  <a href="/" class="hover:text-foreground transition-colors">Projetos</a>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+    <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+  </svg>
+  <span class="text-foreground font-medium truncate max-w-xs">{{ project.name }}</span>
+</nav>
+
+<!-- Project header -->
+<div class="flex items-start justify-between gap-4 mb-6">
+  <div class="flex items-center gap-3 min-w-0">
+    <div class="w-10 h-10 rounded-md brand-gradient flex items-center justify-center shrink-0 shadow-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" class="w-4.5 h-4.5" style="width:1.125rem;height:1.125rem">
+        <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
+      </svg>
+    </div>
+    <div class="min-w-0">
+      <h1 class="text-lg font-semibold tracking-tight truncate">{{ project.name }}</h1>
+      <p class="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3 text-red-400 shrink-0">
+          <path d="M4.918 1.636A.75.75 0 014 2.4v7.2a.75.75 0 001.164.506l4.5-3.6a.75.75 0 000-1.012l-4.5-3.6a.75.75 0 00-.246-.258z"/>
+        </svg>
+        {{ project.channel_name }}
+        {% if project.sources_count > 0 %}
+        <span class="text-muted-foreground/40">·</span>
+        <span>{{ project.sources_count }} clips · {{ project.total_duration }}</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <span class="badge badge-{{ project.phase_color }} shrink-0">{{ project.phase_label }}</span>
+</div>
+
+<!-- Divider -->
+<div class="separator separator-h mb-6"></div>
+
+<!-- Wizard layout -->
+<div class="flex gap-6" x-data="{ active: '{{ active_step }}' }">
+
+  <!-- Step sidebar -->
+  <aside class="w-52 shrink-0">
+    <div class="card overflow-hidden">
+      {% for step in steps %}
+      <button
+        class="step-row w-full text-left px-4 py-3 flex items-center gap-3 transition-colors
+               {% if not step.enabled %}opacity-40 cursor-not-allowed pointer-events-none{% else %}cursor-pointer{% endif %}"
+        :class="active === '{{ step.key }}' ? 'step-row-active' : ''"
+        {% if step.enabled %}
+        hx-get="{{ step.url }}"
+        hx-target="#step-content"
+        hx-swap="innerHTML"
+        @click="active = '{{ step.key }}'"
+        {% endif %}
+      >
+        <!-- Step circle -->
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-colors"
+             :class="active === '{{ step.key }}'
+               ? 'bg-primary text-primary-foreground'
+               : '{% if step.done %}bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400{% else %}bg-muted text-muted-foreground{% endif %}'">
+          {% if step.done %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
+            <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
+          </svg>
+          {% else %}
+          {{ step.index }}
+          {% endif %}
+        </div>
+
+        <!-- Label -->
+        <div class="min-w-0 leading-tight">
+          <p class="text-sm truncate"
+             :class="active === '{{ step.key }}' ? 'font-semibold text-foreground' : 'font-medium text-foreground'">
+            {{ step.label }}
+          </p>
+          {% if step.done %}
+          <p class="text-xs text-green-600 dark:text-green-400 mt-px">Concluído</p>
+          {% elif not step.enabled %}
+          <p class="text-xs text-muted-foreground/50 mt-px">Bloqueado</p>
+          {% endif %}
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+
+    <!-- Progress -->
+    <div class="mt-4 space-y-1.5">
+      <div class="flex justify-between text-xs text-muted-foreground">
+        <span>Pipeline</span>
+        <span>{{ steps_done }}/{{ steps_total }}</span>
+      </div>
+      <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+        <div class="h-full rounded-full bg-primary transition-all duration-500"
+             style="width: {% widthratio steps_done steps_total 100 %}%"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Step content -->
+  <div id="step-content" class="flex-1 min-w-0">
+    {% include active_template %}
+  </div>
+
+</div>
+{% endblock %}

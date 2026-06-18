@@ -1,0 +1,37 @@
+<div class="rounded-lg overflow-hidden border border-border mt-4">
+  <!-- Terminal bar -->
+  <div class="flex items-center justify-between px-4 py-2.5 bg-zinc-950 border-b border-zinc-800">
+    <div class="flex items-center gap-2">
+      <div class="flex gap-1.5">
+        <div class="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+      </div>
+      <span class="text-zinc-500 text-xs font-mono ml-1 tracking-tight">gwan-studio · ffmpeg</span>
+    </div>
+    {% if status == "done" %}
+    <span class="badge badge-success" style="font-size:0.65rem;padding:0.1rem 0.5rem">● concluído</span>
+    {% elif status == "running" %}
+    <span class="badge badge-warning" style="font-size:0.65rem;padding:0.1rem 0.5rem">● executando</span>
+    {% elif status == "failed" %}
+    <span class="badge badge-destructive" style="font-size:0.65rem;padding:0.1rem 0.5rem">✕ falhou</span>
+    {% else %}
+    <span class="badge badge-neutral" style="font-size:0.65rem;padding:0.1rem 0.5rem">pendente</span>
+    {% endif %}
+  </div>
+
+  <!-- Log output -->
+  <div class="bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed space-y-px max-h-44 overflow-y-auto">
+    {% for log in logs %}
+    <div class="
+      {% if log.type == 'success' %}log-success
+      {% elif log.type == 'upload' %}log-upload
+      {% elif log.type == 'progress' %}log-progress
+      {% elif log.type == 'error' %}log-error
+      {% else %}log-info{% endif %}
+    ">{{ log.text }}</div>
+    {% empty %}
+    <div class="log-info">Aguardando início do job...</div>
+    {% endfor %}
+  </div>
+</div>

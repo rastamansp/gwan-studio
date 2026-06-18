@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Gwan Studio{% endblock %}</title>
+
+  <!-- shadcn/ui color system via Tailwind config -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            border:      'hsl(var(--border))',
+            input:       'hsl(var(--input))',
+            ring:        'hsl(var(--ring))',
+            background:  'hsl(var(--background))',
+            foreground:  'hsl(var(--foreground))',
+            primary:     { DEFAULT: 'hsl(var(--primary))',     foreground: 'hsl(var(--primary-foreground))'     },
+            secondary:   { DEFAULT: 'hsl(var(--secondary))',   foreground: 'hsl(var(--secondary-foreground))'   },
+            destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+            muted:       { DEFAULT: 'hsl(var(--muted))',       foreground: 'hsl(var(--muted-foreground))'       },
+            accent:      { DEFAULT: 'hsl(var(--accent))',      foreground: 'hsl(var(--accent-foreground))'      },
+            card:        { DEFAULT: 'hsl(var(--card))',        foreground: 'hsl(var(--card-foreground))'        },
+            popover:     { DEFAULT: 'hsl(var(--popover))',     foreground: 'hsl(var(--popover-foreground))'     },
+          },
+          borderRadius: {
+            lg:  'var(--radius)',
+            md:  'calc(var(--radius) - 2px)',
+            sm:  'calc(var(--radius) - 4px)',
+          },
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+
+  <style>
+    /* ── shadcn/ui design tokens ─────────────────────────────── */
+    :root {
+      --background:          0 0% 100%;
+      --foreground:          240 10% 3.9%;
+      --card:                0 0% 100%;
+      --card-foreground:     240 10% 3.9%;
+      --popover:             0 0% 100%;
+      --popover-foreground:  240 10% 3.9%;
+      --primary:             240 5.9% 10%;
+      --primary-foreground:  0 0% 98%;
+      --secondary:           240 4.8% 95.9%;
+      --secondary-foreground:240 5.9% 10%;
+      --muted:               240 4.8% 95.9%;
+      --muted-foreground:    240 3.8% 46.1%;
+      --accent:              240 4.8% 95.9%;
+      --accent-foreground:   240 5.9% 10%;
+      --destructive:         0 84.2% 60.2%;
+      --destructive-foreground: 0 0% 98%;
+      --border:              240 5.9% 90%;
+      --input:               240 5.9% 90%;
+      --ring:                240 5.9% 10%;
+      --radius:              0.5rem;
+    }
+    .dark {
+      --background:          240 10% 3.9%;
+      --foreground:          0 0% 98%;
+      --card:                240 10% 3.9%;
+      --card-foreground:     0 0% 98%;
+      --popover:             240 10% 3.9%;
+      --popover-foreground:  0 0% 98%;
+      --primary:             0 0% 98%;
+      --primary-foreground:  240 5.9% 10%;
+      --secondary:           240 3.7% 15.9%;
+      --secondary-foreground:0 0% 98%;
+      --muted:               240 3.7% 15.9%;
+      --muted-foreground:    240 5% 64.9%;
+      --accent:              240 3.7% 15.9%;
+      --accent-foreground:   0 0% 98%;
+      --destructive:         0 62.8% 30.6%;
+      --destructive-foreground: 0 0% 98%;
+      --border:              240 3.7% 15.9%;
+      --input:               240 3.7% 15.9%;
+      --ring:                240 4.9% 83.9%;
+    }
+
+    * { box-sizing: border-box; }
+    [x-cloak] { display: none !important; }
+
+    /* ── Button component ───────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 0.375rem; white-space: nowrap; font-weight: 500;
+      font-size: 0.875rem; line-height: 1; border: none;
+      border-radius: calc(var(--radius) - 2px);
+      transition: background-color 120ms, color 120ms, box-shadow 120ms;
+      cursor: pointer; outline: none; text-decoration: none;
+    }
+    .btn:focus-visible { box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring)); }
+    .btn:disabled { pointer-events: none; opacity: 0.5; }
+    .btn-default { height:2.25rem; padding:0 1rem; background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); box-shadow:0 1px 2px rgba(0,0,0,.1); }
+    .btn-default:hover { background:hsl(var(--primary)/.9); }
+    .btn-secondary { height:2.25rem; padding:0 1rem; background:hsl(var(--secondary)); color:hsl(var(--secondary-foreground)); box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .btn-secondary:hover { background:hsl(var(--secondary)/.8); }
+    .btn-outline { height:2.25rem; padding:0 1rem; border:1px solid hsl(var(--border)); background:hsl(var(--background)); color:hsl(var(--foreground)); box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .btn-outline:hover { background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); }
+    .btn-ghost { height:2.25rem; padding:0 1rem; background:transparent; color:hsl(var(--foreground)); }
+    .btn-ghost:hover { background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); }
+    .btn-destructive { height:2.25rem; padding:0 1rem; background:hsl(var(--destructive)); color:hsl(var(--destructive-foreground)); box-shadow:0 1px 2px rgba(0,0,0,.1); }
+    .btn-destructive:hover { background:hsl(var(--destructive)/.9); }
+    .btn-success { height:2.25rem; padding:0 1rem; background:hsl(142 72% 29%); color:#fff; box-shadow:0 1px 2px rgba(0,0,0,.1); }
+    .btn-success:hover { background:hsl(142 72% 24%); }
+    .dark .btn-success { background:hsl(142 72% 36%); }
+    .dark .btn-success:hover { background:hsl(142 72% 42%); }
+    .btn-sm { height:2rem !important; padding:0 0.75rem !important; font-size:0.75rem !important; }
+    .btn-lg { height:2.75rem !important; padding:0 1.5rem !important; font-size:1rem !important; }
+    .btn-icon { height:2.25rem; width:2.25rem; padding:0; }
+    .btn-icon.btn-sm { height:2rem; width:2rem; }
+
+    /* ── Card component ─────────────────────────────────────── */
+    .card {
+      border-radius: var(--radius);
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+      color: hsl(var(--card-foreground));
+      box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    }
+    .card-header { padding: 1.25rem 1.25rem 0; display:flex; flex-direction:column; gap:0.375rem; }
+    .card-title  { font-size:1rem; font-weight:600; line-height:1.25; letter-spacing:-0.01em; }
+    .card-description { font-size:0.875rem; color:hsl(var(--muted-foreground)); }
+    .card-content { padding: 1.25rem; }
+    .card-footer  { padding: 0 1.25rem 1.25rem; display:flex; align-items:center; }
+
+    /* ── Form elements ──────────────────────────────────────── */
+    .input, .textarea, .select {
+      width: 100%; border-radius: calc(var(--radius) - 2px);
+      border: 1px solid hsl(var(--input)); background: transparent;
+      font-size: 0.875rem; color: hsl(var(--foreground));
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+      transition: box-shadow 120ms; outline: none;
+    }
+    .input::placeholder, .textarea::placeholder { color: hsl(var(--muted-foreground)); }
+    .input { display:flex; height:2.25rem; padding:0 0.75rem; }
+    .input:focus { box-shadow: 0 0 0 1px hsl(var(--ring)); }
+    .textarea { display:flex; min-height:5rem; padding:0.5rem 0.75rem; resize:vertical; }
+    .textarea:focus { box-shadow: 0 0 0 1px hsl(var(--ring)); }
+    .select {
+      display:flex; height:2.25rem; padding:0 2rem 0 0.75rem; appearance:none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2371717a'%3E%3Cpath fill-rule='evenodd' d='M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position: right 0.5rem center; background-size:1rem;
+    }
+    .select:focus { box-shadow: 0 0 0 1px hsl(var(--ring)); }
+    .label { font-size:0.875rem; font-weight:500; line-height:1; color:hsl(var(--foreground)); }
+
+    /* ── Badge component ────────────────────────────────────── */
+    .badge {
+      display:inline-flex; align-items:center; gap:0.25rem;
+      border-radius:calc(var(--radius) - 2px);
+      padding:0.1875rem 0.625rem; font-size:0.75rem; font-weight:600; line-height:1.6;
+    }
+    .badge-default   { background:hsl(var(--primary));   color:hsl(var(--primary-foreground));   border:1px solid transparent; box-shadow:0 1px 2px rgba(0,0,0,.1); }
+    .badge-secondary { background:hsl(var(--secondary)); color:hsl(var(--secondary-foreground)); border:1px solid transparent; }
+    .badge-outline   { background:transparent; color:hsl(var(--foreground)); border:1px solid hsl(var(--border)); }
+    .badge-success   { background:hsl(142 72% 29%/.1); color:hsl(142 72% 25%); border:0; box-shadow:0 0 0 1px hsl(142 72% 29%/.2) inset; }
+    .dark .badge-success { background:hsl(142 72% 29%/.2); color:hsl(142 72% 60%); box-shadow:0 0 0 1px hsl(142 72% 60%/.2) inset; }
+    .badge-warning   { background:hsl(38 92% 50%/.1); color:hsl(32 95% 28%); border:0; box-shadow:0 0 0 1px hsl(38 92% 50%/.2) inset; }
+    .dark .badge-warning { background:hsl(38 92% 50%/.2); color:hsl(38 92% 65%); box-shadow:0 0 0 1px hsl(38 92% 65%/.2) inset; }
+    .badge-neutral   { background:hsl(var(--muted)); color:hsl(var(--muted-foreground)); border:1px solid hsl(var(--border)); }
+    .badge-destructive { background:hsl(var(--destructive)/.1); color:hsl(var(--destructive)); border:0; box-shadow:0 0 0 1px hsl(var(--destructive)/.2) inset; }
+
+    /* ── Alert component ────────────────────────────────────── */
+    .alert { border-radius:var(--radius); border:1px solid hsl(var(--border)); padding:0.875rem 1rem; font-size:0.875rem; }
+    .alert-success { border-color:hsl(142 72% 29%/.3); background:hsl(142 72% 29%/.07); color:hsl(142 72% 20%); }
+    .dark .alert-success { background:hsl(142 72% 29%/.15); color:hsl(142 72% 70%); border-color:hsl(142 72% 60%/.2); }
+    .alert-info    { border-color:hsl(217 91% 60%/.3); background:hsl(217 91% 60%/.07); color:hsl(217 91% 30%); }
+    .dark .alert-info { background:hsl(217 91% 60%/.15); color:hsl(217 91% 80%); border-color:hsl(217 91% 60%/.2); }
+
+    /* ── Separator ──────────────────────────────────────────── */
+    .separator { background:hsl(var(--border)); flex-shrink:0; }
+    .separator-h { height:1px; width:100%; }
+
+    /* ── Terminal log ───────────────────────────────────────── */
+    .log-info     { color: #94a3b8; }
+    .log-progress { color: #38bdf8; }
+    .log-success  { color: #4ade80; }
+    .log-upload   { color: #a78bfa; }
+    .log-error    { color: #f87171; }
+
+    /* ── Brand ──────────────────────────────────────────────── */
+    .brand-gradient { background: linear-gradient(135deg,#6366f1,#8b5cf6); }
+    .thumb-overlay  { background: linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.2) 50%,transparent 100%); }
+
+    /* ── Step sidebar ───────────────────────────────────────── */
+    .step-row { border-left:2px solid transparent; transition:all 120ms; }
+    .step-row:hover { background:hsl(var(--accent)); }
+    .step-row-active { border-left-color:hsl(var(--primary)); background:hsl(var(--accent)); }
+
+    /* ── Dropzone ───────────────────────────────────────────── */
+    .dropzone { border:2px dashed hsl(var(--border)); border-radius:var(--radius); transition:all 120ms; }
+    .dropzone:hover { border-color:hsl(var(--primary)/.5); background:hsl(var(--accent)/.5); }
+
+    /* ── Dialog/Modal ───────────────────────────────────────── */
+    dialog::backdrop { background:rgba(0,0,0,.5); }
+    dialog[open] { border-radius:var(--radius); border:1px solid hsl(var(--border)); background:hsl(var(--card)); color:hsl(var(--card-foreground)); box-shadow:0 10px 40px rgba(0,0,0,.15); padding:0; max-width:28rem; width:90%; }
+  </style>
+
+  <script>
+    (function() {
+      if (localStorage.getItem('theme') === 'dark')
+        document.documentElement.classList.add('dark');
+    })();
+  </script>
+</head>
+
+<body class="bg-background text-foreground min-h-screen font-sans antialiased"
+      x-data="{ dark: localStorage.getItem('theme') === 'dark' }"
+      x-init="$watch('dark', v => {
+        localStorage.setItem('theme', v ? 'dark' : 'light');
+        document.documentElement.classList.toggle('dark', v);
+      })">
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur"
+          style="supports:backdrop-filter:bg-background/60">
+    <div class="max-w-6xl mx-auto flex h-14 items-center px-5">
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-2.5 mr-6 hover:opacity-80 transition-opacity">
+        <div class="w-7 h-7 rounded-md brand-gradient flex items-center justify-center shadow-sm shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" class="w-4 h-4">
+            <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
+          </svg>
+        </div>
+        <span class="font-semibold text-sm tracking-tight">Gwan Studio</span>
+      </a>
+
+      <!-- Nav links -->
+      <nav class="hidden md:flex items-center gap-1 text-sm text-muted-foreground">
+        <a href="/" class="px-3 py-1.5 rounded-md hover:text-foreground hover:bg-accent transition-colors">Projetos</a>
+      </nav>
+
+      <div class="ml-auto flex items-center gap-1.5">
+        <!-- Dark mode toggle -->
+        <button class="btn btn-ghost btn-icon btn-sm opacity-70 hover:opacity-100 rounded-md"
+                @click="dark = !dark"
+                :title="dark ? 'Modo claro' : 'Modo escuro'">
+          <svg x-show="!dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+          </svg>
+          <svg x-show="dark" x-cloak xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+
+        <!-- Avatar -->
+        <div class="w-7 h-7 rounded-full brand-gradient flex items-center justify-center text-white text-xs font-semibold select-none shadow-sm">
+          R
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {% if messages %}
+  <div class="max-w-6xl mx-auto px-5 mt-4 space-y-2">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <main class="max-w-6xl mx-auto px-5 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

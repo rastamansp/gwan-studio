@@ -1,0 +1,4 @@
+# Fase 0 — mínimo para rodar telas dummy sem serviços externos
+Django==5.2.*
+django-htmx==1.*
+whitenoise[brotli]==6.*
