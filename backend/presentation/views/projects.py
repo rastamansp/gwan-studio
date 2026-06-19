@@ -8,12 +8,12 @@ import threading
 import uuid
 
 from django.conf import settings
-from django.core.files.storage import default_storage
 from django.http import Http404, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
 from infrastructure.orm.repositories import DjangoProjectRepository
+from infrastructure.storage import get_storage
 
 # ── display constants ──────────────────────────────────────────
 
@@ -329,13 +329,17 @@ def merge_step(request, project_id):
     return render(request, 'projects/detail.html', ctx)
 
 
-def _run_merge_job(job_id: str, source_paths: list[str], output_path: str) -> None:
+def _run_merge_job(job_id: str, source_keys: list[str], output_key: str) -> None:
     """Executa no background thread — chama FFmpeg ou simula; atualiza JobModel."""
     from studio.models import JobModel, ProjectModel
+    storage = get_storage()
     try:
         job = JobModel.objects.get(id=job_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+
+        source_paths = [storage.resolve_read_path(k) for k in source_keys]
+        output_path  = storage.resolve_write_path(output_key)
 
         simulate = getattr(settings, 'MERGE_SIMULATE', False)
         if simulate:
@@ -345,15 +349,15 @@ def _run_merge_job(job_id: str, source_paths: list[str], output_path: str) -> No
             from infrastructure.ffmpeg.merge import run_ffmpeg_merge
             log_lines = run_ffmpeg_merge(source_paths, output_path)
 
+        storage.finalize_write(output_key, output_path, 'video/mp4')
         log_dicts = [{'text': l, 'type': _log_type(l)} for l in log_lines]
         size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
 
         job.status = 'done'
         job.logs = log_dicts
-        job.result = {'output_path': output_path, 'size_bytes': size_bytes}
+        job.result = {'output_key': output_key, 'size_bytes': size_bytes}
         job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
 
-        # Avança fase do projeto
         ProjectModel.objects.filter(id=job.project_id).update(phase='merge_done')
 
     except Exception as exc:
@@ -401,17 +405,9 @@ def merge_start(request, project_id):
         }
         return render(request, template, ctx)
 
-    # Determinar caminhos absolutos dos sources
-    source_paths = []
-    for s in sources:
-        try:
-            source_paths.append(default_storage.path(s.storage_key))
-        except NotImplementedError:
-            pass  # S3 não suportado em phase0
-
-    output_dir = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'merged')
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'merged.mp4')
+    # Chaves de storage (sem resolver paths — o job faz isso via porta)
+    source_keys = [s.storage_key for s in sources]
+    output_key  = f'studio/{project_id}/merged/merged.mp4'
 
     # Criar job
     job = JobModel.objects.create(
@@ -424,7 +420,7 @@ def merge_start(request, project_id):
     # Disparar thread e retornar imediatamente com o template _running
     t = threading.Thread(
         target=_run_merge_job,
-        args=(str(job.id), source_paths, output_path),
+        args=(str(job.id), source_keys, output_key),
         daemon=True,
     )
     t.start()
@@ -488,14 +484,18 @@ def export_step(request, project_id):
 
 
 def _run_export_job(
-    job_id: str, merged_path: str, output_path: str,
+    job_id: str, merged_key: str, final_key: str,
     codec: str, resolution: str, bitrate: str,
 ) -> None:
     from studio.models import JobModel, ProjectModel
+    storage = get_storage()
     try:
         job = JobModel.objects.get(id=job_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+
+        merged_path = storage.resolve_read_path(merged_key)
+        output_path = storage.resolve_write_path(final_key)
 
         simulate = getattr(settings, 'EXPORT_SIMULATE', False)
         if simulate:
@@ -505,17 +505,18 @@ def _run_export_job(
             from infrastructure.ffmpeg.export import run_ffmpeg_export
             log_lines = run_ffmpeg_export(merged_path, output_path, codec, resolution, bitrate)
 
+        storage.finalize_write(final_key, output_path, 'video/mp4')
         log_dicts = [{'text': l, 'type': _log_type(l)} for l in log_lines]
         size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
 
         job.status = 'done'
         job.logs = log_dicts
         job.result = {
-            'output_path': output_path,
-            'size_bytes':  size_bytes,
-            'codec':       codec,
-            'resolution':  resolution,
-            'bitrate':     bitrate,
+            'final_key':  final_key,
+            'size_bytes': size_bytes,
+            'codec':      codec,
+            'resolution': resolution,
+            'bitrate':    bitrate,
         }
         job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
         ProjectModel.objects.filter(id=job.project_id).update(phase='export_done')
@@ -548,12 +549,8 @@ def export_start(request, project_id):
     if codec not in ('copy', 'h264', 'h265'):
         codec = 'copy'
 
-    merged_path = os.path.join(
-        settings.MEDIA_ROOT, 'studio', project_id, 'merged', 'merged.mp4'
-    )
-    output_dir  = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final')
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'final.mp4')
+    merged_key = f'studio/{project_id}/merged/merged.mp4'
+    final_key  = f'studio/{project_id}/final/final.mp4'
 
     job = JobModel.objects.create(
         project=project_obj,
@@ -564,7 +561,7 @@ def export_start(request, project_id):
 
     t = threading.Thread(
         target=_run_export_job,
-        args=(str(job.id), merged_path, output_path, codec, resolution, bitrate),
+        args=(str(job.id), merged_key, final_key, codec, resolution, bitrate),
         daemon=True,
     )
     t.start()
@@ -582,18 +579,19 @@ def export_status(request, project_id):
 
 
 def export_download(request, project_id):
-    from django.http import FileResponse, Http404
-    output_path = os.path.join(
-        settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4'
-    )
-    if not os.path.exists(output_path):
+    from django.http import FileResponse, Http404, HttpResponseRedirect
+    storage = get_storage()
+    final_key = f'studio/{project_id}/final/final.mp4'
+    if not storage.object_exists(final_key):
         raise Http404
-    return FileResponse(
-        open(output_path, 'rb'),
-        as_attachment=True,
-        filename='final.mp4',
-        content_type='video/mp4',
-    )
+    if storage.is_local:
+        return FileResponse(
+            open(storage.resolve_read_path(final_key), 'rb'),
+            as_attachment=True,
+            filename='final.mp4',
+            content_type='video/mp4',
+        )
+    return HttpResponseRedirect(storage.get_presigned_url(final_key, expires=86400))
 
 
 def _latest_thumbnail_job(project_id):
@@ -608,6 +606,7 @@ def _latest_thumbnail_job(project_id):
 
 def _list_thumbnails(project_id: str) -> list[dict]:
     from studio.models import ThumbnailModel
+    storage = get_storage()
     return [
         {
             'id':         str(t.id),
@@ -615,9 +614,7 @@ def _list_thumbnails(project_id: str) -> list[dict]:
             'plan':       t.plan,
             'output_key': t.output_key,
             'selected':   t.selected,
-            'has_image':  bool(t.output_key and os.path.exists(
-                os.path.join(settings.MEDIA_ROOT, t.output_key)
-            )),
+            'has_image':  bool(t.output_key and storage.object_exists(t.output_key)),
         }
         for t in ThumbnailModel.objects.filter(project_id=project_id)
     ]
@@ -694,11 +691,13 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
         job.save(update_fields=['status', 'updated_at'])
 
         simulate = getattr(settings, 'THUMBNAIL_SIMULATE', True)
+        storage = get_storage()
 
         # Escolher vídeo de entrada
-        final_path  = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4')
-        merged_path = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'merged', 'merged.mp4')
-        video_path  = final_path if os.path.exists(final_path) else merged_path
+        final_key  = f'studio/{project_id}/final/final.mp4'
+        merged_key = f'studio/{project_id}/merged/merged.mp4'
+        video_key  = final_key if storage.object_exists(final_key) else merged_key
+        video_path = storage.resolve_read_path(video_key)
 
         if simulate:
             plans = _simulated_plans(project_name)
@@ -719,20 +718,17 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
         # Deletar thumbnails anteriores
         ThumbnailModel.objects.filter(project_id=project_id).delete()
 
-        output_dir = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'thumbnails')
-        os.makedirs(output_dir, exist_ok=True)
-
         for plan in plans:
             variant = plan.get('variant', 'A')
-            out_filename = f'{variant}.jpg'
-            out_path = os.path.join(output_dir, out_filename)
+            thumb_key = f'studio/{project_id}/thumbnails/{variant}.jpg'
+            out_path  = storage.resolve_write_path(thumb_key)
             render_thumbnail(plan, variant, out_path)
-            output_key = os.path.join('studio', project_id, 'thumbnails', out_filename)
+            storage.finalize_write(thumb_key, out_path, 'image/jpeg')
             ThumbnailModel.objects.create(
                 project_id=project_id,
                 variant=variant,
                 plan=plan,
-                output_key=output_key,
+                output_key=thumb_key,
             )
             logs.append({'text': f'Thumbnail {variant} renderizada ({os.path.getsize(out_path)//1024} KB)', 'type': 'success'})
 
@@ -803,14 +799,17 @@ def thumbnail_select(request, project_id):
 
 
 def thumbnail_image(request, project_id, variant):
-    from django.http import FileResponse
+    from django.http import FileResponse, HttpResponseRedirect
     variant = variant.upper()
     if variant not in ('A', 'B', 'C'):
         raise Http404
-    path = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'thumbnails', f'{variant}.jpg')
-    if not os.path.exists(path):
+    storage = get_storage()
+    key = f'studio/{project_id}/thumbnails/{variant}.jpg'
+    if not storage.object_exists(key):
         raise Http404
-    return FileResponse(open(path, 'rb'), content_type='image/jpeg')
+    if storage.is_local:
+        return FileResponse(open(storage.resolve_read_path(key), 'rb'), content_type='image/jpeg')
+    return HttpResponseRedirect(storage.get_presigned_url(key, expires=300))
 
 
 def _get_seo(project_id):
@@ -1033,11 +1032,15 @@ def _publish_checklist(project_id: str) -> tuple[list[dict], bool]:
     items = []
 
     # Export done
-    final_path = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4')
-    export_ok = os.path.exists(final_path)
+    storage = get_storage()
+    final_key = f'studio/{project_id}/final/final.mp4'
+    export_ok = storage.object_exists(final_key)
     if export_ok:
-        sz = os.path.getsize(final_path)
-        sz_str = f'{sz // (1024*1024)} MB' if sz >= 1024 * 1024 else f'{sz // 1024} KB'
+        if storage.is_local:
+            sz = os.path.getsize(storage.resolve_read_path(final_key))
+            sz_str = f'{sz // (1024*1024)} MB' if sz >= 1024 * 1024 else f'{sz // 1024} KB'
+        else:
+            sz_str = 'disponível'
         export_label = f'Export concluído — {sz_str}'
     else:
         export_label = 'Export concluído'
@@ -1182,7 +1185,8 @@ def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
             logs.append({'text': f'video_id fictício: {video_id}', 'type': 'success'})
         else:
             project_obj = ProjectModel.objects.get(id=project_id)
-            final_path  = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4')
+            final_key   = f'studio/{project_id}/final/final.mp4'
+            final_path  = get_storage().resolve_read_path(final_key)
             from infrastructure.youtube.uploader import upload_video
             video_id = upload_video(
                 refresh_token_enc=project_obj.oauth_refresh_token_enc,
@@ -1278,15 +1282,15 @@ def upload_source(request, project_id):
     source_id = str(uuid.uuid4())
     camera = request.POST.get('camera', '').strip()
 
-    # Salvar arquivo em MEDIA_ROOT
+    # Salvar arquivo via storage port
     storage_key = f"studio/{project_id}/sources/{source_id}-{file.name}"
-    default_storage.save(storage_key, file)
+    storage = get_storage()
+    storage.put_object(storage_key, file.read(), f'video/{ext}')
 
     # Tentar extrair duração via ffprobe
     try:
-        full_path = default_storage.path(storage_key)
-        duration_sec = _probe_duration(full_path)
-    except NotImplementedError:
+        duration_sec = _probe_duration(storage.resolve_read_path(storage_key))
+    except Exception:
         duration_sec = 0
 
     # Criar registro no banco
@@ -1335,7 +1339,7 @@ def delete_source(request, project_id, source_id):
     # Deletar arquivo do storage
     if source.storage_key:
         try:
-            default_storage.delete(source.storage_key)
+            get_storage().delete_object(source.storage_key)
         except Exception:
             pass
 

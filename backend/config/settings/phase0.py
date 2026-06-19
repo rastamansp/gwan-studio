@@ -82,6 +82,13 @@ ANTHROPIC_API_KEY  = ''    # Preencher em .env para modo real
 GOOGLE_CLIENT_ID   = ''    # OAuth 2.0 — preencher para modo real
 GOOGLE_CLIENT_SECRET = ''  # OAuth 2.0 — preencher para modo real
 
+# F08 — Storage backend
+STORAGE_BACKEND = 'local'  # 'local' | 'minio'
+MINIO_ENDPOINT  = ''       # ex.: https://s3.gwan.cloud
+MINIO_ACCESS_KEY = ''
+MINIO_SECRET_KEY = ''
+MINIO_BUCKET    = 'studio'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
