@@ -77,7 +77,10 @@ MERGE_SIMULATE     = True  # True = sem FFmpeg real (copia 1º source)
 EXPORT_SIMULATE    = True  # True = copia merged.mp4 como final.mp4
 THUMBNAIL_SIMULATE = True  # True = planos fake (sem Claude) + render Pillow real
 SEO_SIMULATE       = True  # True = SEO fake sem Claude
+PUBLISH_SIMULATE   = True  # True = upload fake, video_id fictício
 ANTHROPIC_API_KEY  = ''    # Preencher em .env para modo real
+GOOGLE_CLIENT_ID   = ''    # OAuth 2.0 — preencher para modo real
+GOOGLE_CLIENT_SECRET = ''  # OAuth 2.0 — preencher para modo real
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LANGUAGE_CODE = 'pt-br'

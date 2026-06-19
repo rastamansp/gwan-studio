@@ -24,6 +24,7 @@ PHASE_LABELS = {
     'export_done':      ('Export Pronto',    'warning'),
     'thumbnails_done':  ('Thumbnails OK',    'warning'),
     'seo_approved':     ('SEO Aprovado',     'success'),
+    'published':        ('Publicado',        'success'),
 }
 
 PHASE_STEP_INDEX = {
@@ -33,6 +34,7 @@ PHASE_STEP_INDEX = {
     'export_done':      3,
     'thumbnails_done':  4,
     'seo_approved':     5,
+    'published':        5,
 }
 
 STEPS_META = [
@@ -1006,12 +1008,244 @@ def seo_approve(request, project_id):
     return render(request, 'seo/_editor.html', {'project': pd, 'seo': _seo_display(seo)})
 
 
-def publish_step(request, project_id):
+# ── F07: YouTube Publish ───────────────────────────────────────
+
+def _get_publish_record(project_id):
+    from studio.models import PublishRecord
+    try:
+        return PublishRecord.objects.get(project_id=project_id)
+    except PublishRecord.DoesNotExist:
+        return None
+
+
+def _latest_publish_job(project_id):
+    from studio.models import JobModel
+    return (
+        JobModel.objects
+        .filter(project_id=project_id, job_type='publish')
+        .order_by('-created_at')
+        .first()
+    )
+
+
+def _publish_checklist(project_id: str) -> tuple[list[dict], bool]:
+    from studio.models import ProjectModel, SeoMetadataModel, ThumbnailModel
+    items = []
+
+    # Export done
+    final_path = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4')
+    export_ok = os.path.exists(final_path)
+    if export_ok:
+        sz = os.path.getsize(final_path)
+        sz_str = f'{sz // (1024*1024)} MB' if sz >= 1024 * 1024 else f'{sz // 1024} KB'
+        export_label = f'Export concluído — {sz_str}'
+    else:
+        export_label = 'Export concluído'
+    items.append({'ok': export_ok, 'label': export_label})
+
+    # SEO approved
+    try:
+        seo = SeoMetadataModel.objects.get(project_id=project_id)
+        seo_ok = seo.approved
+        seo_label = f'SEO aprovado — "{seo.title[:40]}"' if seo.approved and seo.title else 'SEO aprovado'
+    except SeoMetadataModel.DoesNotExist:
+        seo_ok = False
+        seo_label = 'SEO aprovado'
+    items.append({'ok': seo_ok, 'label': seo_label})
+
+    # Thumbnail selected
+    thumb = ThumbnailModel.objects.filter(project_id=project_id, selected=True).first()
+    thumb_ok = thumb is not None
+    thumb_label = f'Thumbnail selecionada — Variante {thumb.variant}' if thumb else 'Thumbnail selecionada'
+    items.append({'ok': thumb_ok, 'label': thumb_label})
+
+    # YouTube connected
+    try:
+        proj = ProjectModel.objects.get(id=project_id)
+        oauth_ok = bool(proj.oauth_refresh_token_enc)
+    except ProjectModel.DoesNotExist:
+        oauth_ok = False
+    items.append({'ok': oauth_ok, 'label': 'Canal YouTube conectado'})
+
+    return items, all(i['ok'] for i in items)
+
+
+def _publish_template_and_ctx(project_id: str) -> tuple[str, dict]:
     pd = _get_or_404(project_id)
+    job = _latest_publish_job(project_id)
+
+    if job and job.status == 'running':
+        return 'publish/_running.html', {'project': pd, 'job': _job_display(job)}
+
+    record = _get_publish_record(project_id)
+    if record:
+        return 'publish/_result.html', {
+            'project':        pd,
+            'record':         record,
+            'pipeline_steps': ['Fontes', 'Merge', 'Export', 'Thumbnails', 'SEO', 'Publicado'],
+        }
+
+    checklist, all_ok = _publish_checklist(project_id)
+    from studio.models import ProjectModel as _PM
+    try:
+        _proj = _PM.objects.get(id=project_id)
+        oauth_connected = bool(_proj.oauth_refresh_token_enc)
+    except _PM.DoesNotExist:
+        oauth_connected = False
+    return 'publish/_oauth.html', {
+        'project':        pd,
+        'checklist':      checklist,
+        'all_ok':         all_ok,
+        'oauth_connected': oauth_connected,
+        'job_error':      job.error if job and job.status == 'failed' else None,
+    }
+
+
+def publish_step(request, project_id):
+    template, extra = _publish_template_and_ctx(project_id)
+    pd = extra['project']
     if request.htmx:
-        return render(request, 'publish/_oauth.html', {'project': pd})
-    ctx = _step_ctx(pd, 'publish', {'active_template': 'publish/_oauth.html'})
+        return render(request, template, extra)
+    ctx = _step_ctx(pd, 'publish', {**extra, 'active_template': template})
     return render(request, 'projects/detail.html', ctx)
+
+
+def publish_oauth_connect(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ProjectModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    simulate = getattr(settings, 'PUBLISH_SIMULATE', True)
+    if simulate:
+        project_obj.oauth_refresh_token_enc = 'SIMULATED_TOKEN_PHASE0'
+        project_obj.save(update_fields=['oauth_refresh_token_enc'])
+    else:
+        # Real: build Google OAuth redirect URL and redirect
+        from google_auth_oauthlib.flow import Flow
+        flow = Flow.from_client_config(
+            {'web': {
+                'client_id':     settings.GOOGLE_CLIENT_ID,
+                'client_secret': settings.GOOGLE_CLIENT_SECRET,
+                'auth_uri':      'https://accounts.google.com/o/oauth2/auth',
+                'token_uri':     'https://oauth2.googleapis.com/token',
+                'redirect_uris': [request.build_absolute_uri(f'/projects/{project_id}/publish/oauth/callback/')],
+            }},
+            scopes=['https://www.googleapis.com/auth/youtube.upload'],
+        )
+        flow.redirect_uri = request.build_absolute_uri(f'/projects/{project_id}/publish/oauth/callback/')
+        auth_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
+        request.session[f'oauth_state_{project_id}'] = state
+        from django.http import HttpResponseRedirect
+        return HttpResponseRedirect(auth_url)
+
+    template, ctx = _publish_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def publish_oauth_disconnect(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ProjectModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    project_obj.oauth_refresh_token_enc = ''
+    project_obj.save(update_fields=['oauth_refresh_token_enc'])
+
+    template, ctx = _publish_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
+    import time
+    from studio.models import JobModel, ProjectModel, PublishRecord
+    logs = []
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+
+        simulate = getattr(settings, 'PUBLISH_SIMULATE', True)
+        if simulate:
+            time.sleep(1.5)
+            video_id    = 'dQw4w9WgXcQ'
+            youtube_url = f'https://www.youtube.com/watch?v={video_id}'
+            logs.append({'text': '[SIMULADO] Upload para YouTube simulado', 'type': 'info'})
+            logs.append({'text': f'video_id fictício: {video_id}', 'type': 'success'})
+        else:
+            project_obj = ProjectModel.objects.get(id=project_id)
+            final_path  = os.path.join(settings.MEDIA_ROOT, 'studio', project_id, 'final', 'final.mp4')
+            from infrastructure.youtube.uploader import upload_video
+            video_id = upload_video(
+                refresh_token_enc=project_obj.oauth_refresh_token_enc,
+                video_path=final_path,
+                title='',
+                description='',
+                tags=[],
+                visibility=visibility,
+                log_fn=lambda msg: logs.append({'text': msg, 'type': 'info'}),
+            )
+            youtube_url = f'https://www.youtube.com/watch?v={video_id}'
+            logs.append({'text': f'Upload concluído: {youtube_url}', 'type': 'success'})
+
+        PublishRecord.objects.update_or_create(
+            project_id=project_id,
+            defaults={'video_id': video_id, 'youtube_url': youtube_url, 'visibility': visibility},
+        )
+
+        job.status = 'done'
+        job.logs   = logs
+        job.result = {'video_id': video_id, 'youtube_url': youtube_url}
+        job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
+        ProjectModel.objects.filter(id=project_id).update(phase='published')
+
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error  = str(exc)
+            job.logs   = logs
+            job.save(update_fields=['status', 'error', 'logs', 'updated_at'])
+        except Exception:
+            pass
+
+
+def publish_start(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ProjectModel, JobModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    visibility = request.POST.get('visibility', 'private')
+    if visibility not in ('public', 'unlisted', 'private'):
+        visibility = 'private'
+
+    job = JobModel.objects.create(project=project_obj, job_type='publish', status='pending')
+    threading.Thread(
+        target=_run_publish_job,
+        args=(str(job.id), project_id, visibility),
+        daemon=True,
+    ).start()
+
+    pd = _get_or_404(project_id)
+    return render(request, 'publish/_running.html', {'project': pd, 'job': _job_display(job)})
+
+
+def publish_status(request, project_id):
+    template, ctx = _publish_template_and_ctx(project_id)
+    return render(request, template, ctx)
 
 # ── F02: Source upload / delete / list ────────────────────────
 

@@ -10,11 +10,13 @@ class ProjectModel(models.Model):
         EXPORT_DONE = 'export_done', 'Export Pronto'
         THUMBNAILS_DONE = 'thumbnails_done', 'Thumbnails OK'
         SEO_APPROVED = 'seo_approved', 'SEO Aprovado'
+        PUBLISHED    = 'published',   'Publicado'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     channel_name = models.CharField(max_length=100, blank=True)
     phase = models.CharField(max_length=30, choices=Phase.choices, default=Phase.NEW)
+    oauth_refresh_token_enc = models.CharField(max_length=512, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -120,3 +122,18 @@ class SeoMetadataModel(models.Model):
 
     def __str__(self):
         return f"SEO — {self.project}"
+
+
+class PublishRecord(models.Model):
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project     = models.OneToOneField(ProjectModel, on_delete=models.CASCADE, related_name='publish')
+    video_id    = models.CharField(max_length=50)
+    youtube_url = models.CharField(max_length=200)
+    visibility  = models.CharField(max_length=20, default='private')
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'studio_publish'
+
+    def __str__(self):
+        return f"Publish {self.video_id} — {self.project}"

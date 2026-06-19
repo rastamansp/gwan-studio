@@ -1,0 +1,59 @@
+{% comment %}F07 — Upload em progresso; polling a cada 2s.{% endcomment %}
+<div class="space-y-5"
+     hx-get="/projects/{{ project.id }}/publish/status/"
+     hx-trigger="every 2s"
+     hx-target="#step-content"
+     hx-swap="innerHTML">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Publicando no YouTube</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">Upload em andamento…</p>
+    </div>
+    <span class="badge badge-secondary flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
+      Enviando
+    </span>
+  </div>
+
+  <div class="card px-4 py-5 space-y-4">
+    <div class="flex items-center gap-4">
+      <div class="w-9 h-9 rounded-md bg-red-500/10 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor"
+             style="animation: spin 2s linear infinite;">
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/>
+          <path d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="white"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm font-medium">Fazendo upload de "{{ project.name }}"</p>
+        <p class="text-xs text-muted-foreground mt-0.5">Aguarde — o vídeo ficará disponível como Privado após o upload</p>
+        <div class="mt-3 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div class="h-full bg-red-500 rounded-full"
+               style="animation: indeterminate 1.5s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-1.5">
+      <div class="flex items-center gap-2 text-xs text-muted-foreground">
+        <span class="w-3.5 h-3.5 rounded-full border-2 border-red-400 border-t-transparent animate-spin shrink-0"></span>
+        Enviando final.mp4 via YouTube Data API v3…
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>SEO</button>
+    <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Publicando…</button>
+  </div>
+</div>
+
+<style>
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(1);   }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
