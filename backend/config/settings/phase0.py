@@ -76,6 +76,7 @@ ALLOWED_VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv']
 MERGE_SIMULATE     = True  # True = sem FFmpeg real (copia 1º source)
 EXPORT_SIMULATE    = True  # True = copia merged.mp4 como final.mp4
 THUMBNAIL_SIMULATE = True  # True = planos fake (sem Claude) + render Pillow real
+SEO_SIMULATE       = True  # True = SEO fake sem Claude
 ANTHROPIC_API_KEY  = ''    # Preencher em .env para modo real
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

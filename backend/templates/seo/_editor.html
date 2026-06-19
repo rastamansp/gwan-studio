@@ -1,107 +1,221 @@
-<div class="space-y-3" x-data="{
-  approved: false,
-  title: '{{ seo.title|escapejs }}',
-  get titleLen() { return this.title.length },
-  get titleOk() { return this.titleLen >= 40 && this.titleLen <= 100 }
-}">
+{% comment %}
+F06 — Editor de SEO com campos reais. Salva via POST seo/save/ e aprova via POST seo/approve/.
+seo: {title, description, tags, approved, tags_count, tags_chars}
+{% endcomment %}
+<div class="space-y-4"
+     x-data="{
+       title:       '{{ seo.title|default:''|escapejs }}',
+       description: '{{ seo.description|default:''|escapejs }}',
+       tags:        {{ seo.tags_json|default:'[]' }},
+       approved:    {{ seo.approved|yesno:'true,false' }},
+       saving: false,
+       approving: false,
+       newTag: '',
+       get titleLen() { return this.title.length },
+       get titleOk()  { return this.titleLen >= 40 && this.titleLen <= 100 },
+       get tagsChars() { return this.tags.reduce((s,t) => s + t.length, 0) },
+       get tagsOk()   { return this.tags.length >= 5 && this.tags.length <= 20 && this.tagsChars <= 500 },
+       addTag() {
+         const t = this.newTag.trim().toLowerCase();
+         if (t && !this.tags.includes(t) && this.tags.length < 20) {
+           this.tags.push(t); this.newTag = ''; this.approved = false;
+         }
+       },
+       removeTag(i) { this.tags.splice(i, 1); this.approved = false; },
+       getCsrf() { const m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ''; },
+       save() {
+         if (this.saving) return;
+         this.saving = true;
+         const fd = new FormData();
+         fd.append('csrfmiddlewaretoken', this.getCsrf());
+         fd.append('title',       this.title);
+         fd.append('description', this.description);
+         fd.append('tags',        JSON.stringify(this.tags));
+         fetch('/projects/{{ project.id }}/seo/save/', { method: 'POST', body: fd })
+           .then(r => r.text())
+           .then(html => {
+             const t = document.getElementById('step-content');
+             if (t) { t.innerHTML = html; htmx.process(t); }
+           })
+           .finally(() => { this.saving = false; });
+       },
+       approve() {
+         if (this.approving) return;
+         this.approving = true;
+         const fd = new FormData();
+         fd.append('csrfmiddlewaretoken', this.getCsrf());
+         fetch('/projects/{{ project.id }}/seo/approve/', { method: 'POST', body: fd })
+           .then(r => r.text())
+           .then(html => {
+             const t = document.getElementById('step-content');
+             if (t) { t.innerHTML = html; htmx.process(t); }
+           })
+           .finally(() => { this.approving = false; });
+       },
+       regenerate() {
+         const fd = new FormData();
+         fd.append('csrfmiddlewaretoken', this.getCsrf());
+         fd.append('context', '{{ seo.context|escapejs }}');
+         fetch('/projects/{{ project.id }}/seo/generate/', { method: 'POST', body: fd })
+           .then(r => r.text())
+           .then(html => {
+             const t = document.getElementById('step-content');
+             if (t) { t.innerHTML = html; htmx.process(t); }
+           });
+       },
+     }">
 
-  <!-- Title -->
-  <div class="card">
-    <div class="card-header">
-      <div class="flex items-center justify-between">
-        <label class="label text-xs uppercase tracking-wide text-muted-foreground">Título</label>
-        <span class="text-xs font-mono"
-              :class="titleOk ? 'text-green-600 dark:text-green-400' : titleLen > 100 ? 'text-destructive' : 'text-yellow-600 dark:text-yellow-400'">
-          <span x-text="titleLen"></span>/100
-        </span>
-      </div>
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">SEO com IA</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">Revise e aprove para publicar</p>
     </div>
-    <div class="card-content pt-0 space-y-1.5">
-      <input type="text" class="input font-medium" x-model="title" value="{{ seo.title }}">
-      <p class="text-xs" :class="titleOk ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'">
-        <span x-show="titleOk" x-cloak>✓ Comprimento ideal para YouTube (40–100 chars)</span>
-        <span x-show="!titleOk">Ideal: 40–100 caracteres</span>
-      </p>
-    </div>
+    <span class="badge" :class="approved ? 'badge-success' : 'badge-secondary'">
+      <span x-text="approved ? 'SEO aprovado' : 'Não aprovado'"></span>
+    </span>
   </div>
 
-  <!-- Description -->
-  <div class="card">
-    <div class="card-header">
-      <div class="flex items-center justify-between">
-        <label class="label text-xs uppercase tracking-wide text-muted-foreground">Descrição</label>
-        <span class="text-xs text-muted-foreground">Máx. 5000 chars</span>
-      </div>
+  <!-- Título -->
+  <div class="card px-4 py-3 space-y-2">
+    <div class="flex items-center justify-between">
+      <label class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Título</label>
+      <span class="text-xs font-mono"
+            :class="titleOk ? 'text-green-500' : titleLen > 100 ? 'text-destructive' : 'text-yellow-500'">
+        <span x-text="titleLen"></span>/100
+      </span>
     </div>
-    <div class="card-content pt-0">
-      <textarea class="textarea font-mono text-xs leading-relaxed" style="min-height:10rem">{{ seo.description }}</textarea>
+    <input type="text" class="input font-medium" x-model="title"
+           maxlength="100" @input="approved = false">
+    <p class="text-xs" :class="titleOk ? 'text-green-500' : 'text-muted-foreground'">
+      <span x-show="titleOk" x-cloak>✓ Comprimento ideal (40–100 chars)</span>
+      <span x-show="!titleOk">Ideal: 40–100 caracteres</span>
+    </p>
+  </div>
+
+  <!-- Descrição -->
+  <div class="card px-4 py-3 space-y-2">
+    <div class="flex items-center justify-between">
+      <label class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Descrição</label>
+      <span class="text-xs text-muted-foreground" x-text="description.length + '/5000'"></span>
     </div>
+    <textarea class="textarea font-mono text-xs leading-relaxed" style="min-height:10rem"
+              x-model="description" maxlength="5000"
+              @input="approved = false"></textarea>
   </div>
 
   <!-- Tags -->
-  <div class="card">
-    <div class="card-header">
-      <div class="flex items-center justify-between">
-        <label class="label text-xs uppercase tracking-wide text-muted-foreground">Tags</label>
-        <span class="text-xs text-muted-foreground">{{ seo.tags|length }} tags</span>
-      </div>
+  <div class="card px-4 py-3 space-y-2">
+    <div class="flex items-center justify-between">
+      <label class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tags</label>
+      <span class="text-xs font-mono"
+            :class="tagsOk ? 'text-green-500' : 'text-yellow-500'">
+        <span x-text="tags.length"></span> tags · <span x-text="tagsChars"></span>/500 chars
+      </span>
     </div>
-    <div class="card-content pt-0 space-y-2">
-      <div class="flex flex-wrap gap-1.5">
-        {% for tag in seo.tags %}
-        <span class="badge badge-secondary gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors">
-          {{ tag }}
-          <button class="text-muted-foreground/50 hover:text-destructive leading-none">×</button>
+    <div class="flex flex-wrap gap-1.5 min-h-[2rem]">
+      <template x-for="(tag, idx) in tags" :key="tag">
+        <span class="badge badge-secondary gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
+              @click="removeTag(idx)">
+          <span x-text="tag"></span>
+          <span class="text-muted-foreground/50 hover:text-destructive leading-none">×</span>
         </span>
-        {% endfor %}
+      </template>
+    </div>
+    <input type="text" class="input font-mono text-xs"
+           placeholder="nova-tag (Enter para adicionar)"
+           x-model="newTag"
+           @keydown.enter.prevent="addTag()"
+           @keydown.comma.prevent="addTag()">
+    <p class="text-xs text-muted-foreground">Enter ou vírgula para adicionar · Clique na tag para remover</p>
+  </div>
+
+  <!-- Score SEO -->
+  <div class="card px-4 py-3 space-y-2">
+    <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Qualidade SEO</p>
+    <div class="space-y-1.5">
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-muted-foreground">Título (40–100 chars)</span>
+        <span :class="titleOk ? 'text-green-500 font-medium' : 'text-yellow-500'">
+          <span x-show="titleOk" x-cloak>✓ Ótimo</span>
+          <span x-show="!titleOk">Ajustar</span>
+        </span>
       </div>
-      <input type="text" class="input font-mono text-xs"
-             placeholder="nova-tag (Enter para adicionar)">
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-muted-foreground">Descrição preenchida</span>
+        <span :class="description.length > 100 ? 'text-green-500 font-medium' : 'text-yellow-500'">
+          <span x-show="description.length > 100" x-cloak>✓ Ótimo</span>
+          <span x-show="description.length <= 100">Curta</span>
+        </span>
+      </div>
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-muted-foreground">Tags (5–20)</span>
+        <span :class="tagsOk ? 'text-green-500 font-medium' : 'text-yellow-500'">
+          <span x-show="tagsOk" x-cloak>✓ <span x-text="tags.length"></span> tags</span>
+          <span x-show="!tagsOk"><span x-text="tags.length"></span> tags</span>
+        </span>
+      </div>
     </div>
   </div>
 
-  <!-- Quality score -->
-  <div class="card">
-    <div class="card-content">
-      <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Qualidade SEO</p>
-      <div class="space-y-2">
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-muted-foreground">Título (40–100 chars)</span>
-          <span :class="titleOk ? 'text-green-600 dark:text-green-400 font-medium' : 'text-yellow-600'">
-            <span x-show="titleOk" x-cloak>✓ Ótimo</span>
-            <span x-show="!titleOk">Ajustar</span>
-          </span>
-        </div>
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-muted-foreground">Descrição com capítulos</span>
-          <span class="text-green-600 dark:text-green-400 font-medium">✓ Ótimo</span>
-        </div>
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-muted-foreground">Tags (5–15)</span>
-          <span class="text-green-600 dark:text-green-400 font-medium">✓ {{ seo.tags|length }} tags</span>
-        </div>
-      </div>
+  <!-- Ações -->
+  <div class="flex items-center justify-between gap-3">
+    <div class="flex items-center gap-2">
+      <!-- Salvar -->
+      <button class="btn btn-outline btn-sm gap-1.5"
+              :disabled="saving"
+              :class="saving ? 'opacity-50 cursor-wait' : ''"
+              @click="save()">
+        <span x-show="saving" class="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
+        <span x-text="saving ? 'Salvando...' : 'Salvar'"></span>
+      </button>
+      <!-- Regenerar -->
+      <button class="btn btn-ghost btn-sm gap-1.5" @click="regenerate()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+          <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08 1.977.75.75 0 01-1.448-.388A6 6 0 0113.058 4.58l.778.778V3.227a.75.75 0 01.75-.75z" clip-rule="evenodd"/>
+          <path fill-rule="evenodd" d="M2.164 13.523a.75.75 0 01-.75-.75V9.591a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.977l.84.841a4.5 4.5 0 007.08-1.977.75.75 0 111.448.388A6 6 0 012.943 11.42l-.778-.778v1.131a.75.75 0 01-.75.75z" clip-rule="evenodd"/>
+        </svg>
+        Regenerar
+      </button>
     </div>
-  </div>
-
-  <!-- Approve -->
-  <div class="flex items-center justify-between">
-    <div>
-      <div x-show="approved" x-cloak class="flex items-center gap-1.5 text-green-600 dark:text-green-400 text-sm font-medium">
+    <!-- Aprovar -->
+    <div class="flex items-center gap-3">
+      <div x-show="approved" x-cloak
+           class="flex items-center gap-1.5 text-green-500 text-sm font-medium">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
           <path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 01.208 1.04l-5 7.5a.75.75 0 01-1.154.114l-3-3a.75.75 0 011.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 011.04-.207z" clip-rule="evenodd"/>
         </svg>
         SEO aprovado
       </div>
-      <p x-show="!approved" class="text-xs text-muted-foreground">Revise e aprove para continuar</p>
+      <button class="btn btn-sm gap-1.5"
+              :class="approved ? 'btn-outline' : 'btn-success'"
+              :disabled="approving || approved"
+              @click="approve()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
+          <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
+        </svg>
+        <span x-text="approved ? 'Aprovado!' : (approving ? 'Aprovando...' : 'Aprovar SEO')"></span>
+      </button>
     </div>
-    <button class="btn btn-sm gap-1.5"
-            :class="approved ? 'btn-outline' : 'btn-success'"
-            @click="approved = true">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
-        <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
+  </div>
+
+  <!-- Nav -->
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/thumbnail/"
+            hx-target="#step-content" hx-swap="innerHTML">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M9.78 11.78a.75.75 0 01-1.06 0L5.47 8.53a.75.75 0 010-1.06l3.25-3.25a.75.75 0 011.06 1.06L7.06 8l2.72 2.72a.75.75 0 010 1.06z" clip-rule="evenodd"/>
       </svg>
-      <span x-text="approved ? 'Aprovado!' : 'Aprovar SEO'"></span>
+      Thumbnails
+    </button>
+    <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/publish/"
+            hx-target="#step-content" hx-swap="innerHTML">
+      Próximo: Publicar
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
     </button>
   </div>
 </div>

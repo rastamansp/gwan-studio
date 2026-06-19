@@ -811,13 +811,199 @@ def thumbnail_image(request, project_id, variant):
     return FileResponse(open(path, 'rb'), content_type='image/jpeg')
 
 
-def seo_step(request, project_id):
+def _get_seo(project_id):
+    from studio.models import SeoMetadataModel
+    try:
+        return SeoMetadataModel.objects.get(project_id=project_id)
+    except SeoMetadataModel.DoesNotExist:
+        return None
+
+
+def _seo_display(seo) -> dict:
+    tags = seo.tags or []
+    return {
+        'title':       seo.title,
+        'description': seo.description,
+        'tags':        tags,
+        'tags_json':   json.dumps(tags, ensure_ascii=False),
+        'approved':    seo.approved,
+        'context':     seo.context,
+        'tags_count':  len(tags),
+        'tags_chars':  sum(len(t) for t in tags),
+    }
+
+
+def _latest_seo_job(project_id):
+    from studio.models import JobModel
+    return (
+        JobModel.objects
+        .filter(project_id=project_id, job_type='seo')
+        .order_by('-created_at')
+        .first()
+    )
+
+
+def _seo_template_and_ctx(project_id: str) -> tuple[str, dict]:
     pd = _get_or_404(project_id)
-    extra = {'seo': _MOCK_SEO}
+    job = _latest_seo_job(project_id)
+    seo = _get_seo(project_id)
+
+    if job and job.status == 'running':
+        return 'seo/_running.html', {'project': pd, 'job': _job_display(job)}
+
+    if seo:
+        return 'seo/_editor.html', {'project': pd, 'seo': _seo_display(seo)}
+
+    return 'seo/_generator.html', {
+        'project': pd,
+        'job_error': job.error if job and job.status == 'failed' else None,
+    }
+
+
+def seo_step(request, project_id):
+    template, extra = _seo_template_and_ctx(project_id)
+    pd = extra['project']
     if request.htmx:
-        return render(request, 'seo/_generator.html', {'project': pd, **extra})
-    ctx = _step_ctx(pd, 'seo', {**extra, 'active_template': 'seo/_generator.html'})
+        return render(request, template, extra)
+    ctx = _step_ctx(pd, 'seo', {**extra, 'active_template': template})
     return render(request, 'projects/detail.html', ctx)
+
+
+def _simulated_seo(project_name: str, channel_name: str, context: str) -> dict:
+    name = project_name.strip()
+    channel = channel_name.strip() or 'YouTube'
+    ctx_line = f' — {context[:80]}' if context.strip() else ''
+    title = f'{name[:85]}{ctx_line}'[:100]
+    description = (
+        f'Neste vídeo, {name.lower()}.{(" " + context.strip()) if context.strip() else ""}\n\n'
+        '📌 O que você vai ver:\n'
+        '→ Introdução ao tema\n'
+        '→ Desenvolvimento passo a passo\n'
+        '→ Resultado final e conclusão\n\n'
+        f'Curtiu? Inscreva-se no canal {channel} e ative as notificações! '
+        'Deixe seu comentário abaixo com dúvidas ou sugestões.\n\n'
+        '#brasil #youtube #conteudo'
+    )
+    words = (name + ' ' + context).lower().split()
+    base_tags = list(dict.fromkeys(w.strip('.,!?') for w in words if len(w) > 3))[:8]
+    extra_tags = ['youtube', 'brasil', 'tutorial', 'dicas', 'vlog', channel.lower()]
+    tags = (base_tags + extra_tags)[:15]
+    return {'title': title, 'description': description, 'tags': tags}
+
+
+def _run_seo_job(job_id: str, project_id: str, project_name: str,
+                 channel_name: str, context: str) -> None:
+    from studio.models import JobModel, SeoMetadataModel, ProjectModel
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+
+        simulate = getattr(settings, 'SEO_SIMULATE', True)
+        if simulate:
+            data = _simulated_seo(project_name, channel_name, context)
+        else:
+            api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+            from infrastructure.ai.seo_generator import generate_seo
+            data = generate_seo(project_name, channel_name, context, api_key=api_key)
+
+        title       = data.get('title', '')[:100]
+        description = data.get('description', '')[:5000]
+        tags        = [str(t)[:100] for t in data.get('tags', []) if t][:20]
+
+        SeoMetadataModel.objects.update_or_create(
+            project_id=project_id,
+            defaults={
+                'title':       title,
+                'description': description,
+                'tags':        tags,
+                'approved':    False,
+                'context':     context,
+            },
+        )
+
+        job.status = 'done'
+        job.result = {'title': title, 'tags_count': len(tags)}
+        job.save(update_fields=['status', 'result', 'updated_at'])
+
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error = str(exc)
+            job.save(update_fields=['status', 'error', 'updated_at'])
+        except Exception:
+            pass
+
+
+def seo_generate(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import ProjectModel, JobModel
+    try:
+        project_obj = ProjectModel.objects.get(id=project_id)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+    context = request.POST.get('context', '').strip()
+
+    job = JobModel.objects.create(project=project_obj, job_type='seo', status='pending')
+    threading.Thread(
+        target=_run_seo_job,
+        args=(str(job.id), project_id, project_obj.name, project_obj.channel_name, context),
+        daemon=True,
+    ).start()
+
+    pd = _get_or_404(project_id)
+    return render(request, 'seo/_running.html', {'project': pd, 'job': _job_display(job)})
+
+
+def seo_status(request, project_id):
+    template, ctx = _seo_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def seo_save(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import SeoMetadataModel
+    seo, _ = SeoMetadataModel.objects.get_or_create(project_id=project_id)
+
+    title       = request.POST.get('title', seo.title)[:100]
+    description = request.POST.get('description', seo.description)[:5000]
+    raw_tags    = request.POST.get('tags', '[]')
+    try:
+        tags = [str(t)[:100] for t in json.loads(raw_tags) if t][:20]
+    except (json.JSONDecodeError, ValueError):
+        tags = seo.tags
+
+    seo.title       = title
+    seo.description = description
+    seo.tags        = tags
+    seo.approved    = False
+    seo.save(update_fields=['title', 'description', 'tags', 'approved', 'updated_at'])
+
+    pd = _get_or_404(project_id)
+    return render(request, 'seo/_editor.html', {'project': pd, 'seo': _seo_display(seo)})
+
+
+def seo_approve(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    from studio.models import SeoMetadataModel, ProjectModel
+    seo = _get_seo(project_id)
+    if not seo:
+        return JsonResponse({'error': 'SEO não gerado ainda'}, status=400)
+
+    seo.approved = True
+    seo.save(update_fields=['approved', 'updated_at'])
+    ProjectModel.objects.filter(id=project_id).update(phase='seo_approved')
+
+    pd = _get_or_404(project_id)
+    return render(request, 'seo/_editor.html', {'project': pd, 'seo': _seo_display(seo)})
 
 
 def publish_step(request, project_id):

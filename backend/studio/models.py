@@ -102,3 +102,21 @@ class ThumbnailModel(models.Model):
 
     def __str__(self):
         return f"Thumbnail {self.variant} — {self.project}"
+
+
+class SeoMetadataModel(models.Model):
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project     = models.OneToOneField(ProjectModel, on_delete=models.CASCADE, related_name='seo')
+    title       = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    tags        = models.JSONField(default=list)
+    approved    = models.BooleanField(default=False)
+    context     = models.TextField(blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'studio_seo'
+
+    def __str__(self):
+        return f"SEO — {self.project}"
