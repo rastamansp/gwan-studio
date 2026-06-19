@@ -1,15 +1,20 @@
 import os
+
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.phase0')
 
-application = get_asgi_application()
+# Django setup MUST complete before importing consumers (which import models).
+django_asgi_app = get_asgi_application()
 
-# Fase A: substituir por Channels routing:
-# from channels.routing import ProtocolTypeRouter, URLRouter
-# from channels.auth import AuthMiddlewareStack
-# from presentation.ws import routing
-# application = ProtocolTypeRouter({
-#     "http": get_asgi_application(),
-#     "websocket": AuthMiddlewareStack(URLRouter(routing.websocket_urlpatterns)),
-# })
+from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
+from django.urls import re_path  # noqa: E402
+
+from infrastructure.ws.consumer import ProjectConsumer  # noqa: E402
+
+application = ProtocolTypeRouter({
+    "http": django_asgi_app,
+    "websocket": URLRouter([
+        re_path(r"^ws/projects/(?P<project_id>[^/]+)/$", ProjectConsumer.as_asgi()),
+    ]),
+})

@@ -13,10 +13,12 @@ DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
 
 INSTALLED_APPS = [
+    'daphne',  # first — overrides runserver to use ASGI/Daphne (WebSocket support)
     'django.contrib.contenttypes',
     'django.contrib.staticfiles',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'channels',
     'django_htmx',
     'studio',
 ]
@@ -88,6 +90,14 @@ MINIO_ENDPOINT  = ''       # ex.: https://s3.gwan.cloud
 MINIO_ACCESS_KEY = ''
 MINIO_SECRET_KEY = ''
 MINIO_BUCKET    = 'studio'
+
+# F09 — WebSocket via Django Channels (InMemoryChannelLayer para Fase 0)
+ASGI_APPLICATION = 'config.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LANGUAGE_CODE = 'pt-br'

@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import threading
+import time
 import uuid
 
 from django.conf import settings
@@ -76,6 +77,16 @@ _MOCK_THUMBNAILS = [
      'gradient': 'from-blue-950 via-indigo-900 to-violet-800',
      'overlay_top': '🏆 COMPLETEI', 'overlay_sub': '200 km em 3 dias', 'tag': 'Conquista'},
 ]
+
+# ── F09: WS event emission ─────────────────────────────────────
+
+def _emit_job_event(project_id: str, event: dict) -> None:
+    """Append a job event to the in-process WS store; never crashes callers."""
+    try:
+        from infrastructure.ws.event_store import append_event
+        append_event(project_id, event)
+    except Exception:
+        pass
 
 # ── format helpers ─────────────────────────────────────────────
 
@@ -335,8 +346,12 @@ def _run_merge_job(job_id: str, source_keys: list[str], output_key: str) -> None
     storage = get_storage()
     try:
         job = JobModel.objects.get(id=job_id)
+        project_id = str(job.project_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'merge', 'status': 'running',
+        }})
 
         source_paths = [storage.resolve_read_path(k) for k in source_keys]
         output_path  = storage.resolve_write_path(output_key)
@@ -350,22 +365,37 @@ def _run_merge_job(job_id: str, source_keys: list[str], output_key: str) -> None
             log_lines = run_ffmpeg_merge(source_paths, output_path)
 
         storage.finalize_write(output_key, output_path, 'video/mp4')
-        log_dicts = [{'text': l, 'type': _log_type(l)} for l in log_lines]
+
+        log_dicts = []
+        for line in log_lines:
+            time.sleep(0.1)
+            log_dicts.append({'text': line, 'type': _log_type(line)})
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'merge', 'status': 'running', 'log_line': line,
+            }})
+
         size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
 
         job.status = 'done'
         job.logs = log_dicts
         job.result = {'output_key': output_key, 'size_bytes': size_bytes}
         job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
-
-        ProjectModel.objects.filter(id=job.project_id).update(phase='merge_done')
+        ProjectModel.objects.filter(id=project_id).update(phase='merge_done')
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'merge', 'status': 'done',
+            'output_params': {'size_bytes': size_bytes},
+        }})
 
     except Exception as exc:
         try:
             job = JobModel.objects.get(id=job_id)
+            project_id = str(job.project_id)
             job.status = 'failed'
             job.error = str(exc)
             job.save(update_fields=['status', 'error', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'merge', 'status': 'failed', 'error': str(exc),
+            }})
         except Exception:
             pass
 
@@ -491,8 +521,12 @@ def _run_export_job(
     storage = get_storage()
     try:
         job = JobModel.objects.get(id=job_id)
+        project_id = str(job.project_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'export', 'status': 'running',
+        }})
 
         merged_path = storage.resolve_read_path(merged_key)
         output_path = storage.resolve_write_path(final_key)
@@ -506,7 +540,15 @@ def _run_export_job(
             log_lines = run_ffmpeg_export(merged_path, output_path, codec, resolution, bitrate)
 
         storage.finalize_write(final_key, output_path, 'video/mp4')
-        log_dicts = [{'text': l, 'type': _log_type(l)} for l in log_lines]
+
+        log_dicts = []
+        for line in log_lines:
+            time.sleep(0.1)
+            log_dicts.append({'text': line, 'type': _log_type(line)})
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'export', 'status': 'running', 'log_line': line,
+            }})
+
         size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
 
         job.status = 'done'
@@ -519,14 +561,22 @@ def _run_export_job(
             'bitrate':    bitrate,
         }
         job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
-        ProjectModel.objects.filter(id=job.project_id).update(phase='export_done')
+        ProjectModel.objects.filter(id=project_id).update(phase='export_done')
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'export', 'status': 'done',
+            'output_params': {'size_bytes': size_bytes, 'codec': codec},
+        }})
 
     except Exception as exc:
         try:
             job = JobModel.objects.get(id=job_id)
+            project_id = str(job.project_id)
             job.status = 'failed'
             job.error = str(exc)
             job.save(update_fields=['status', 'error', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'export', 'status': 'failed', 'error': str(exc),
+            }})
         except Exception:
             pass
 
@@ -689,6 +739,9 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
         job = JobModel.objects.get(id=job_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'thumbnail', 'status': 'running',
+        }})
 
         simulate = getattr(settings, 'THUMBNAIL_SIMULATE', True)
         storage = get_storage()
@@ -730,13 +783,20 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
                 plan=plan,
                 output_key=thumb_key,
             )
-            logs.append({'text': f'Thumbnail {variant} renderizada ({os.path.getsize(out_path)//1024} KB)', 'type': 'success'})
+            log_line = f'Thumbnail {variant} renderizada ({os.path.getsize(out_path)//1024} KB)'
+            logs.append({'text': log_line, 'type': 'success'})
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'thumbnail', 'status': 'running', 'log_line': log_line,
+            }})
 
         job.status = 'done'
         job.logs = logs
         job.result = {'variants': [p.get('variant') for p in plans]}
         job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
         ProjectModel.objects.filter(id=project_id).update(phase='thumbnails_done')
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'thumbnail', 'status': 'done',
+        }})
 
     except Exception as exc:
         try:
@@ -745,6 +805,9 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
             job.error = str(exc)
             job.logs = logs
             job.save(update_fields=['status', 'error', 'logs', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'thumbnail', 'status': 'failed', 'error': str(exc),
+            }})
         except Exception:
             pass
 
@@ -899,12 +962,23 @@ def _run_seo_job(job_id: str, project_id: str, project_name: str,
         job = JobModel.objects.get(id=job_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'seo', 'status': 'running',
+        }})
 
         simulate = getattr(settings, 'SEO_SIMULATE', True)
         if simulate:
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'seo', 'status': 'running',
+                'log_line': '[SIMULADO] Gerando metadados SEO sem Claude…',
+            }})
             data = _simulated_seo(project_name, channel_name, context)
         else:
             api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'seo', 'status': 'running',
+                'log_line': 'Chamando Claude para gerar título, descrição e tags…',
+            }})
             from infrastructure.ai.seo_generator import generate_seo
             data = generate_seo(project_name, channel_name, context, api_key=api_key)
 
@@ -926,6 +1000,10 @@ def _run_seo_job(job_id: str, project_id: str, project_name: str,
         job.status = 'done'
         job.result = {'title': title, 'tags_count': len(tags)}
         job.save(update_fields=['status', 'result', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'seo', 'status': 'done',
+            'output_params': {'title': title, 'tags_count': len(tags)},
+        }})
 
     except Exception as exc:
         try:
@@ -933,6 +1011,9 @@ def _run_seo_job(job_id: str, project_id: str, project_name: str,
             job.status = 'failed'
             job.error = str(exc)
             job.save(update_fields=['status', 'error', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'seo', 'status': 'failed', 'error': str(exc),
+            }})
         except Exception:
             pass
 
@@ -1168,17 +1249,28 @@ def publish_oauth_disconnect(request, project_id):
 
 
 def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
-    import time
     from studio.models import JobModel, ProjectModel, PublishRecord
     logs = []
     try:
         job = JobModel.objects.get(id=job_id)
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'publish', 'status': 'running',
+        }})
 
         simulate = getattr(settings, 'PUBLISH_SIMULATE', True)
         if simulate:
-            time.sleep(1.5)
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'publish', 'status': 'running',
+                'log_line': '[SIMULADO] Iniciando upload para YouTube…',
+            }})
+            time.sleep(0.8)
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'publish', 'status': 'running',
+                'log_line': '[SIMULADO] Upload em progresso (100%)…',
+            }})
+            time.sleep(0.7)
             video_id    = 'dQw4w9WgXcQ'
             youtube_url = f'https://www.youtube.com/watch?v={video_id}'
             logs.append({'text': '[SIMULADO] Upload para YouTube simulado', 'type': 'info'})
@@ -1210,6 +1302,10 @@ def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
         job.result = {'video_id': video_id, 'youtube_url': youtube_url}
         job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
         ProjectModel.objects.filter(id=project_id).update(phase='published')
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'publish', 'status': 'done',
+            'output_params': {'video_id': video_id, 'youtube_url': youtube_url},
+        }})
 
     except Exception as exc:
         try:
@@ -1218,6 +1314,9 @@ def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
             job.error  = str(exc)
             job.logs   = logs
             job.save(update_fields=['status', 'error', 'logs', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'publish', 'status': 'failed', 'error': str(exc),
+            }})
         except Exception:
             pass
 
@@ -1359,3 +1458,44 @@ def source_list_partial(request, project_id):
 
 def health_check(request):
     return JsonResponse({'status': 'ok'})
+
+
+# ── F09: REST API — jobs ───────────────────────────────────────
+
+def api_job_list(request, project_id):
+    """GET /api/projects/:id/jobs/ — últimos 20 jobs do projeto."""
+    from studio.models import JobModel
+    jobs = JobModel.objects.filter(project_id=project_id).order_by('-created_at')[:20]
+    return JsonResponse({
+        'jobs': [
+            {
+                'id':         str(j.id),
+                'job_type':   j.job_type,
+                'status':     j.status,
+                'error':      j.error,
+                'result':     j.result,
+                'created_at': j.created_at.isoformat() if j.created_at else None,
+                'updated_at': j.updated_at.isoformat() if j.updated_at else None,
+            }
+            for j in jobs
+        ]
+    })
+
+
+def api_job_detail(request, project_id, job_id):
+    """GET /api/projects/:id/jobs/:jobId — job com logs completos."""
+    from studio.models import JobModel
+    try:
+        job = JobModel.objects.get(id=job_id, project_id=project_id)
+    except JobModel.DoesNotExist:
+        raise Http404
+    return JsonResponse({
+        'id':         str(job.id),
+        'job_type':   job.job_type,
+        'status':     job.status,
+        'error':      job.error,
+        'logs':       job.logs or [],
+        'result':     job.result or {},
+        'created_at': job.created_at.isoformat() if job.created_at else None,
+        'updated_at': job.updated_at.isoformat() if job.updated_at else None,
+    })

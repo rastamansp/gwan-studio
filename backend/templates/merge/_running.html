@@ -37,9 +37,14 @@ F03 — Estado de execução do merge. HTMX faz polling a cada 2s em merge/statu
     </div>
   </div>
 
-  <!-- Log parcial (se houver) -->
+  <!-- Live log (WebSocket) — aparece quando WS conectar -->
+  <div id="ws-live-logs-merge"
+       class="card px-4 py-3 space-y-0.5 max-h-40 overflow-y-auto font-mono text-xs hidden">
+  </div>
+
+  <!-- Log do banco (HTMX fallback enquanto WS não conectar) -->
   {% if job.logs %}
-  <div class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
+  <div id="db-logs-merge" class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
     {% for entry in job.logs %}
     <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'progress' %}text-blue-400{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
       {{ entry.text }}
@@ -47,6 +52,48 @@ F03 — Estado de execução do merge. HTMX faz polling a cada 2s em merge/statu
     {% endfor %}
   </div>
   {% endif %}
+
+  <script>
+  (function() {
+    var pid = '{{ project.id }}';
+    var statusUrl = '/projects/{{ project.id }}/merge/status/';
+    var logEl = document.getElementById('ws-live-logs-merge');
+    var dbEl  = document.getElementById('db-logs-merge');
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    function appendLine(text, cls) {
+      var p = document.createElement('p');
+      p.className = cls || 'text-muted-foreground';
+      p.textContent = text;
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    function handleEvent(ev) {
+      if (!ev || ev.event !== 'job.update') return;
+      var d = ev.data || {};
+      if (d.type !== 'merge') return;
+      if (d.log_line) appendLine(d.log_line);
+      if (d.status === 'done' || d.status === 'failed') {
+        if (typeof htmx !== 'undefined')
+          htmx.ajax('GET', statusUrl, {target: '#step-content', swap: 'innerHTML'});
+      }
+    }
+    try {
+      var ws = new WebSocket(proto + '//' + location.host + '/ws/projects/' + pid + '/');
+      ws.onopen = function() {
+        logEl.classList.remove('hidden');
+        if (dbEl) dbEl.classList.add('hidden');
+      };
+      ws.onmessage = function(e) {
+        var msg; try { msg = JSON.parse(e.data); } catch(err) { return; }
+        if (msg.event === 'project.snapshot') {
+          (msg.data.recentEvents || []).forEach(handleEvent);
+        } else {
+          handleEvent(msg);
+        }
+      };
+    } catch(err) {}
+  })();
+  </script>
 
   <!-- Source list (readonly) -->
   <div class="space-y-1.5">

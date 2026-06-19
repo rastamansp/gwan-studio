@@ -34,8 +34,13 @@
     </div>
   </div>
 
+  <!-- Live log (WebSocket) -->
+  <div id="ws-live-logs-export"
+       class="card px-4 py-3 space-y-0.5 max-h-40 overflow-y-auto font-mono text-xs hidden">
+  </div>
+
   {% if job.logs %}
-  <div class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
+  <div id="db-logs-export" class="card px-4 py-3 space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
     {% for entry in job.logs %}
     <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'progress' %}text-blue-400{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
       {{ entry.text }}
@@ -49,6 +54,48 @@
     <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Próximo: Thumbnails</button>
   </div>
 </div>
+
+<script>
+(function() {
+  var pid = '{{ project.id }}';
+  var statusUrl = '/projects/{{ project.id }}/export/status/';
+  var logEl = document.getElementById('ws-live-logs-export');
+  var dbEl  = document.getElementById('db-logs-export');
+  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  function appendLine(text) {
+    var p = document.createElement('p');
+    p.className = 'text-muted-foreground';
+    p.textContent = text;
+    logEl.appendChild(p);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function handleEvent(ev) {
+    if (!ev || ev.event !== 'job.update') return;
+    var d = ev.data || {};
+    if (d.type !== 'export') return;
+    if (d.log_line) appendLine(d.log_line);
+    if (d.status === 'done' || d.status === 'failed') {
+      if (typeof htmx !== 'undefined')
+        htmx.ajax('GET', statusUrl, {target: '#step-content', swap: 'innerHTML'});
+    }
+  }
+  try {
+    var ws = new WebSocket(proto + '//' + location.host + '/ws/projects/' + pid + '/');
+    ws.onopen = function() {
+      logEl.classList.remove('hidden');
+      if (dbEl) dbEl.classList.add('hidden');
+    };
+    ws.onmessage = function(e) {
+      var msg; try { msg = JSON.parse(e.data); } catch(err) { return; }
+      if (msg.event === 'project.snapshot') {
+        (msg.data.recentEvents || []).forEach(handleEvent);
+      } else {
+        handleEvent(msg);
+      }
+    };
+  } catch(err) {}
+})();
+</script>
 
 <style>
 @keyframes indeterminate {

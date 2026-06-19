@@ -43,11 +43,52 @@
     </div>
   </div>
 
+  <!-- Live log (WebSocket) -->
+  <div id="ws-live-logs-publish"
+       class="card px-4 py-3 space-y-0.5 max-h-28 overflow-y-auto font-mono text-xs hidden">
+  </div>
+
   <div class="flex items-center justify-between pt-2">
     <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>SEO</button>
     <button class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed" disabled>Publicando…</button>
   </div>
 </div>
+
+<script>
+(function() {
+  var pid = '{{ project.id }}';
+  var statusUrl = '/projects/{{ project.id }}/publish/status/';
+  var logEl = document.getElementById('ws-live-logs-publish');
+  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  function handleEvent(ev) {
+    if (!ev || ev.event !== 'job.update') return;
+    var d = ev.data || {};
+    if (d.type !== 'publish') return;
+    if (d.log_line) {
+      var p = document.createElement('p');
+      p.className = 'text-muted-foreground';
+      p.textContent = d.log_line;
+      logEl.appendChild(p);
+      logEl.classList.remove('hidden');
+    }
+    if (d.status === 'done' || d.status === 'failed') {
+      if (typeof htmx !== 'undefined')
+        htmx.ajax('GET', statusUrl, {target: '#step-content', swap: 'innerHTML'});
+    }
+  }
+  try {
+    var ws = new WebSocket(proto + '//' + location.host + '/ws/projects/' + pid + '/');
+    ws.onmessage = function(e) {
+      var msg; try { msg = JSON.parse(e.data); } catch(err) { return; }
+      if (msg.event === 'project.snapshot') {
+        (msg.data.recentEvents || []).forEach(handleEvent);
+      } else {
+        handleEvent(msg);
+      }
+    };
+  } catch(err) {}
+})();
+</script>
 
 <style>
 @keyframes indeterminate {

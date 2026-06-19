@@ -5,3 +5,5 @@ whitenoise[brotli]==6.*
 # F05
 Pillow==10.*
 anthropic==0.*
+# F09 — WebSocket
+channels[daphne]==4.*

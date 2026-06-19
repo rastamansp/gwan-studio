@@ -36,4 +36,7 @@ urlpatterns = [
     path('projects/<str:project_id>/publish/start/', projects.publish_start, name='publish-start'),
     path('projects/<str:project_id>/publish/status/', projects.publish_status, name='publish-status'),
     path('api/health/', projects.health_check, name='health-check'),
+    # F09 — REST API jobs
+    path('api/projects/<str:project_id>/jobs/', projects.api_job_list, name='api-job-list'),
+    path('api/projects/<str:project_id>/jobs/<str:job_id>/', projects.api_job_detail, name='api-job-detail'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
