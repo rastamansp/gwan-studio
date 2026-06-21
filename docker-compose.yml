@@ -22,9 +22,28 @@ services:
     env_file:
       - path: .env
         required: false
+    # As variáveis abaixo são preenchidas na aba "Environment variables" do Portainer.
+    # ATENÇÃO: no Portainer, env vars do stack só fazem substituição ${...} no compose —
+    # NÃO entram no container sozinhas. Por isso precisam estar listadas aqui.
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - PORT=3018
+      # Obrigatórias (falham o deploy com mensagem clara se não definidas no Portainer):
+      - SECRET_KEY=${SECRET_KEY:?defina SECRET_KEY nas Environment variables do Portainer}
+      - DATABASE_URL=${DATABASE_URL:?defina DATABASE_URL (postgresql://...) no Portainer}
+      # Com default de produção (sobrescreva no Portainer se necessário):
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-studio.gwan.cloud}
+      - REDIS_URL=${REDIS_URL:-redis://cache.gwan.cloud:6379/0}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-s3.gwan.cloud}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-}
+      - MINIO_BUCKET=${MINIO_BUCKET:-studio}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-True}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OAUTH_REDIRECT_URI=${OAUTH_REDIRECT_URI:-https://studio.gwan.cloud/api/oauth/youtube/callback/}
+      - OAUTH_ENCRYPTION_KEY=${OAUTH_ENCRYPTION_KEY:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=gwan-network"
@@ -69,8 +88,11 @@ services:
   #   env_file:
   #     - path: .env
   #       required: false
-  #   environment:
+  #   environment:  # repetir o mesmo bloco environment do serviço app (SECRET_KEY, DATABASE_URL, REDIS_URL, etc.)
   #     - DJANGO_SETTINGS_MODULE=config.settings.production
+  #     - SECRET_KEY=${SECRET_KEY:?}
+  #     - DATABASE_URL=${DATABASE_URL:?}
+  #     - REDIS_URL=${REDIS_URL:-redis://cache.gwan.cloud:6379/0}
   #   logging:
   #     driver: json-file
   #     options:
