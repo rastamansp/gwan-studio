@@ -38,7 +38,7 @@
 
         <form method="post" action="{% url 'login' %}" class="space-y-4">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{{ next|default:'/projects/' }}">
+          <input type="hidden" name="next" value="{{ next|default:'/dashboard/' }}">
 
           <div class="space-y-2">
             <label class="label" for="id_username">Usuário</label>

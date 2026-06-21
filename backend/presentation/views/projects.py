@@ -238,6 +238,11 @@ def home(request):
     return render(request, 'home.html')
 
 
+def dashboard(request):
+    projects = [_to_display(p) for p in _repo().list()]
+    return render(request, 'dashboard.html', {'projects': projects})
+
+
 def project_list(request):
     projects = [_to_display(p) for p in _repo().list()]
     return render(request, 'projects/list.html', {'projects': projects})

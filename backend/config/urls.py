@@ -18,6 +18,7 @@ urlpatterns = [
         name='login',
     ),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('dashboard/', login_required(projects.dashboard), name='dashboard'),
     path('projects/', login_required(projects.project_list), name='project-list'),
     path('projects/new/', login_required(projects.project_new), name='project-new'),
     path('projects/<str:project_id>/', login_required(projects.project_detail), name='project-detail'),
