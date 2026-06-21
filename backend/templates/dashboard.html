@@ -1,0 +1,240 @@
+{% extends "internal/base.html" %}
+{% block title %}Dashboard - Gwan Studio{% endblock %}
+
+{% block internal_extra_head %}
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 16px;
+  }
+
+  .dashboard-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .dashboard-panel-head h2 {
+    margin: 0;
+    color: #06111f;
+    font-size: 15px;
+    font-weight: 850;
+    letter-spacing: -0.02em;
+  }
+
+  .dashboard-panel-head p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .recent-list {
+    display: grid;
+  }
+
+  .recent-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    padding: 15px 16px;
+    color: inherit;
+    text-decoration: none;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .recent-row:first-child {
+    border-top: 0;
+  }
+
+  .recent-row:hover {
+    background: #f8fafc;
+  }
+
+  .recent-row h3 {
+    margin: 0;
+    color: #06111f;
+    font-size: 14px;
+    font-weight: 850;
+  }
+
+  .recent-row p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .action-list {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .action-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    color: #0f172a;
+    background: #ffffff;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .system-list {
+    display: grid;
+    gap: 1px;
+    background: #e2e8f0;
+  }
+
+  .system-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 16px;
+    background: #ffffff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .system-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #047857;
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .system-ok::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #10b981;
+  }
+
+  @media (max-width: 980px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+{% endblock %}
+
+{% block internal_content %}
+<div class="page-head">
+  <div>
+    <p class="page-kicker">Dashboard</p>
+    <h1 class="page-title">Visao geral do sistema</h1>
+    <p class="page-description">
+      Acompanhe os sinais principais do studio e entre rapidamente nos projetos em andamento.
+    </p>
+  </div>
+  <button class="app-button" onclick="document.getElementById('modal-new').showModal()">
+    Novo projeto
+  </button>
+</div>
+
+<div class="stat-grid">
+  <div class="panel stat-card">
+    <strong>{{ projects|length }}</strong>
+    <span>projetos cadastrados</span>
+  </div>
+  <div class="panel stat-card">
+    <strong>{% if projects %}{{ projects.0.sources_count }}{% else %}0{% endif %}</strong>
+    <span>clips no projeto mais recente</span>
+  </div>
+  <div class="panel stat-card">
+    <strong>{% if projects %}{{ projects.0.phase_label }}{% else %}-{% endif %}</strong>
+    <span>fase do projeto mais recente</span>
+  </div>
+  <div class="panel stat-card">
+    <strong>{% if projects %}{{ projects.0.updated_at }}{% else %}-{% endif %}</strong>
+    <span>ultima atividade</span>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <section class="panel">
+    <div class="dashboard-panel-head">
+      <div>
+        <h2>Projetos recentes</h2>
+        <p>Continue de onde parou ou abra a listagem completa.</p>
+      </div>
+      <a href="{% url 'project-list' %}" class="app-button-secondary">Ver todos</a>
+    </div>
+
+    <div class="recent-list">
+      {% for project in projects|slice:":5" %}
+      <a href="/projects/{{ project.id }}/" class="recent-row">
+        <div>
+          <h3>{{ project.name }}</h3>
+          <p>{{ project.channel_name }} · {{ project.sources_count }} clips · {{ project.updated_at }}</p>
+        </div>
+        <span class="badge badge-{{ project.phase_color }}">{{ project.phase_label }}</span>
+      </a>
+      {% empty %}
+      <div class="recent-row">
+        <div>
+          <h3>Nenhum projeto ainda</h3>
+          <p>Crie o primeiro workspace para iniciar o fluxo.</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="dashboard-panel-head">
+      <div>
+        <h2>Atalhos</h2>
+        <p>Acoes rapidas da area interna.</p>
+      </div>
+    </div>
+
+    <div class="action-list">
+      <button class="action-item" onclick="document.getElementById('modal-new').showModal()">
+        Criar novo projeto
+        <span>+</span>
+      </button>
+      <a href="{% url 'project-list' %}" class="action-item">
+        Abrir listagem
+        <span>&gt;</span>
+      </a>
+    </div>
+
+    <div class="dashboard-panel-head" style="border-top:1px solid #e2e8f0;">
+      <div>
+        <h2>Sistema</h2>
+        <p>Estado operacional local.</p>
+      </div>
+    </div>
+    <div class="system-list">
+      <div class="system-item">
+        <span>Autenticacao</span>
+        <span class="system-ok">ativa</span>
+      </div>
+      <div class="system-item">
+        <span>API</span>
+        <span class="system-ok">online</span>
+      </div>
+      <div class="system-item">
+        <span>Sessao</span>
+        <span class="system-ok">{{ request.user.username }}</span>
+      </div>
+    </div>
+  </aside>
+</div>
+
+{% include "projects/_project_dialog.html" %}
+{% endblock %}
