@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_htmx',
     'django_celery_results',
+    'studio',  # app local com os models (ProjectModel etc.)
 ]
 
 MIDDLEWARE = [
