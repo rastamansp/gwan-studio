@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Gwan Studio - Editor online para GoPro e YouTube{% endblock %}
 {% block main_class %}w-full overflow-hidden{% endblock %}
 
@@ -47,34 +48,15 @@
   .landing-brand {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
-    color: #06111f;
+    justify-content: center;
     text-decoration: none;
-    font-weight: 800;
-    font-family: "Space Grotesk", "Inter", sans-serif;
-    letter-spacing: 0;
   }
 
-  .brand-copy small {
+  .brand-logo {
     display: block;
-    margin-top: 2px;
-    color: #64748b;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-family: "Inter", sans-serif;
-  }
-
-  .brand-mark {
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    color: #ffffff;
-    background: linear-gradient(135deg, #0b1220 0%, #1d4ed8 55%, #0891b2 100%);
-    box-shadow: 0 12px 28px rgba(29, 78, 216, 0.18);
+    width: 212px;
+    height: auto;
+    filter: drop-shadow(0 7px 16px rgba(15, 23, 42, 0.05));
   }
 
   .landing-links {
@@ -100,7 +82,7 @@
     bottom: -10px;
     height: 2px;
     border-radius: 999px;
-    background: #1d4ed8;
+    background: linear-gradient(90deg, #00b8ff 0%, #1d4ed8 100%);
     transform: scaleX(0);
     transform-origin: center;
     transition: transform 140ms ease;
@@ -123,7 +105,7 @@
     border-radius: 14px;
     color: #ffffff;
     background: #06111f;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
     text-decoration: none;
     font-size: 13px;
     font-weight: 800;
@@ -162,11 +144,11 @@
     gap: 10px;
     margin-bottom: 16px;
     padding: 7px 11px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(0, 184, 255, 0.16);
     border-radius: 14px;
     color: #0f172a;
-    background: rgba(255, 255, 255, 0.78);
-    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(240, 249, 255, 0.84));
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -177,8 +159,8 @@
     width: 8px;
     height: 8px;
     border-radius: 999px;
-    background: #0ea5e9;
-    box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.14);
+    background: #00b8ff;
+    box-shadow: 0 0 0 5px rgba(0, 184, 255, 0.13);
   }
 
   .hero-brand {
@@ -205,6 +187,7 @@
   .hero-statement strong {
     color: #1d4ed8;
     font-weight: inherit;
+    text-shadow: 0 6px 22px rgba(29, 78, 216, 0.10);
   }
 
   .hero-text {
@@ -238,8 +221,8 @@
 
   .primary-action {
     color: #ffffff;
-    background: linear-gradient(135deg, #06111f 0%, #1d4ed8 100%);
-    box-shadow: 0 18px 38px rgba(29, 78, 216, 0.20);
+    background: #1d4ed8;
+    box-shadow: 0 18px 38px rgba(29, 78, 216, 0.18);
   }
 
   .primary-action:hover {
@@ -250,11 +233,11 @@
   .secondary-action {
     color: #0f172a;
     background: rgba(255, 255, 255, 0.76);
-    border: 1px solid rgba(15, 23, 42, 0.10);
+    border: 1px solid rgba(0, 184, 255, 0.14);
   }
 
   .secondary-action:hover {
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(240, 249, 255, 0.96);
   }
 
   .hero-points {
@@ -278,7 +261,8 @@
     width: 6px;
     height: 6px;
     border-radius: 999px;
-    background: #10b981;
+    background: #00b8ff;
+    box-shadow: 0 0 0 4px rgba(0, 184, 255, 0.10);
   }
 
   .product-shot {
@@ -345,7 +329,7 @@
 
   .panel-label {
     margin: 0 0 10px;
-    color: #94a3b8;
+    color: #7dd3fc;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -382,8 +366,8 @@
     padding: 5px 8px;
     border-radius: 999px;
     color: #dbeafe;
-    background: rgba(56, 189, 248, 0.10);
-    border: 1px solid rgba(56, 189, 248, 0.20);
+    background: rgba(0, 184, 255, 0.12);
+    border: 1px solid rgba(0, 184, 255, 0.24);
     font-weight: 800;
   }
 
@@ -585,7 +569,7 @@
 
   .eyebrow {
     margin: 0 0 10px;
-    color: #1d4ed8;
+    color: #00aef3;
     font-size: 12px;
     font-weight: 900;
     letter-spacing: 0.12em;
@@ -950,15 +934,7 @@
   <div class="landing-container">
     <nav class="landing-nav" aria-label="Navegação principal">
       <a href="/" class="landing-brand">
-        <span class="brand-mark">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-            <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
-          </svg>
-        </span>
-        <span class="brand-copy">
-          <span>Gwan Studio</span>
-          <small>Action video automation</small>
-        </span>
+        <img src="{% static 'brand/gwan-studio-logo-header-white.png' %}" alt="Gwan Studio" class="brand-logo">
       </a>
 
       <div class="landing-links">
