@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Criar conta - Gwan Studio{% endblock %}
+{% block extra_head %}
+{% include "components/public_header_styles.html" %}
+<style>
+  .auth-page {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 16% 16%, rgba(14, 165, 233, 0.16), transparent 24%),
+      radial-gradient(circle at 84% 20%, rgba(29, 78, 216, 0.12), transparent 22%),
+      linear-gradient(180deg, rgba(238, 246, 255, 0.92) 0%, rgba(255, 255, 255, 1) 48%),
+      #f7fafc;
+  }
+
+  .auth-grid-card {
+    border-radius: 22px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 22px 56px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .register-point {
+    border-radius: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 14px 16px;
+  }
+
+  .register-point strong {
+    display: block;
+    color: #06111f;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .register-point span {
+    display: block;
+    margin-top: 6px;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .field-help {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .field-error {
+    color: #b91c1c;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+</style>
+{% endblock %}
+{% block main_class %}min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-5 py-10{% endblock %}
+{% block header %}
+{% include "components/public_header.html" with public_header_cta_url="/login/" public_header_cta_label="Entrar" public_header_secondary_url="/" public_header_secondary_label="Voltar" %}
+{% endblock %}
+
+{% block content %}
+<section class="auth-page w-full max-w-6xl rounded-[28px] px-5 py-6 lg:px-6 lg:py-8">
+  <div class="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] items-center">
+    <div class="hidden lg:block">
+      <div class="auth-grid-card p-8">
+        <div class="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <span class="inline-block h-2 w-2 rounded-full bg-sky-500"></span>
+          Novo acesso
+        </div>
+        <h1 class="mt-5 text-5xl font-display font-bold tracking-tight text-foreground">Crie sua conta e entre no Studio.</h1>
+        <p class="mt-5 max-w-xl text-[15px] leading-7 text-muted-foreground">
+          Seu acesso comeca aqui. Crie um usuario, defina a senha e entre direto no dashboard para trabalhar com os projetos internos.
+        </p>
+        <div class="mt-8 grid gap-3 text-sm text-muted-foreground">
+          <div class="register-point"><strong>Cadastro enxuto</strong><span>Voce precisa apenas de usuario e senha para abrir seu workspace.</span></div>
+          <div class="register-point"><strong>Entrada imediata</strong><span>Assim que a conta for criada, o sistema ja inicia sua sessao.</span></div>
+          <div class="register-point"><strong>Pronto para operar</strong><span>O dashboard vira sua porta de entrada para acompanhar o pipeline.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="w-full max-w-md lg:ml-auto">
+      <div class="card overflow-hidden border-border shadow-sm">
+        <div class="card-header">
+          <p class="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Cadastro</p>
+          <h2 class="card-title text-2xl font-display">Crie sua conta</h2>
+          <p class="card-description">Defina seu usuario e senha para acessar o ambiente interno.</p>
+        </div>
+        <div class="card-content">
+          {% if form.non_field_errors %}
+          <div class="alert alert-info mb-4">
+            {% for error in form.non_field_errors %}
+            <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <form method="post" action="{% url 'register' %}" class="space-y-4">
+            {% csrf_token %}
+
+            <div class="space-y-2">
+              <label class="label" for="{{ form.username.id_for_label }}">Usuario</label>
+              {{ form.username }}
+              {% if form.username.help_text %}
+              <p class="field-help">{{ form.username.help_text }}</p>
+              {% endif %}
+              {% for error in form.username.errors %}
+              <p class="field-error">{{ error }}</p>
+              {% endfor %}
+            </div>
+
+            <div class="space-y-2">
+              <label class="label" for="{{ form.password1.id_for_label }}">Senha</label>
+              {{ form.password1 }}
+              {% if form.password1.help_text %}
+              <p class="field-help">{{ form.password1.help_text }}</p>
+              {% endif %}
+              {% for error in form.password1.errors %}
+              <p class="field-error">{{ error }}</p>
+              {% endfor %}
+            </div>
+
+            <div class="space-y-2">
+              <label class="label" for="{{ form.password2.id_for_label }}">Confirmar senha</label>
+              {{ form.password2 }}
+              {% if form.password2.help_text %}
+              <p class="field-help">{{ form.password2.help_text }}</p>
+              {% endif %}
+              {% for error in form.password2.errors %}
+              <p class="field-error">{{ error }}</p>
+              {% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn-default btn-lg w-full">Criar conta e entrar</button>
+          </form>
+
+          <div class="mt-5 rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+            Ja tem conta? <a href="{% url 'login' %}" class="font-semibold text-primary">Entrar no Studio</a>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

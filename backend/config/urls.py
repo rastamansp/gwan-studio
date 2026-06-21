@@ -11,6 +11,7 @@ from presentation.views import projects
 urlpatterns = [
     path('', projects.home, name='home'),
     path('admin/', admin.site.urls),
+    path('register/', projects.register, name='register'),
     path(
         'login/',
         auth_views.LoginView.as_view(

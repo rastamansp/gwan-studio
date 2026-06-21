@@ -1,57 +1,111 @@
 {% extends "base.html" %}
 {% block title %}Entrar - Gwan Studio{% endblock %}
+{% block extra_head %}
+{% include "components/public_header_styles.html" %}
+<style>
+  .auth-page {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 14% 14%, rgba(14, 165, 233, 0.16), transparent 24%),
+      radial-gradient(circle at 88% 18%, rgba(16, 185, 129, 0.12), transparent 20%),
+      linear-gradient(180deg, rgba(238, 246, 255, 0.92) 0%, rgba(255, 255, 255, 1) 48%),
+      #f7fafc;
+  }
+
+  .auth-grid-card {
+    border-radius: 22px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 22px 56px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .auth-metric {
+    border-radius: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 14px 16px;
+  }
+
+  .auth-metric strong {
+    display: block;
+    color: #06111f;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .auth-metric span {
+    display: block;
+    margin-top: 6px;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+</style>
+{% endblock %}
 {% block main_class %}min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-5 py-10{% endblock %}
+{% block header %}
+{% include "components/public_header.html" with public_header_cta_url="/register/" public_header_cta_label="Criar conta" public_header_secondary_url="/" public_header_secondary_label="Voltar" %}
+{% endblock %}
 
 {% block content %}
-<section class="w-full max-w-5xl grid gap-8 lg:grid-cols-[1.05fr_0.95fr] items-center">
-  <div class="hidden lg:block">
-    <div class="rounded-2xl border border-border bg-card p-8 shadow-sm">
-      <div class="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
-        Acesso protegido
-      </div>
-      <h1 class="mt-5 text-5xl font-display font-bold tracking-tight text-foreground">Entre no Studio e continue seu pipeline.</h1>
-      <p class="mt-5 max-w-xl text-[15px] leading-7 text-muted-foreground">
-        Seus projetos, etapas de produção e publicações agora ficam atrás de autenticação. Entre com seu usuário para abrir a área interna com segurança.
-      </p>
-      <div class="mt-8 grid gap-3 text-sm text-muted-foreground">
-        <div class="rounded-xl border border-border bg-background px-4 py-3">Projetos protegidos por sessão autenticada</div>
-        <div class="rounded-xl border border-border bg-background px-4 py-3">Redirecionamento automático para a área interna após login</div>
-        <div class="rounded-xl border border-border bg-background px-4 py-3">Saída visível no header para encerrar a sessão com um clique</div>
+<section class="auth-page w-full max-w-6xl rounded-[28px] px-5 py-6 lg:px-6 lg:py-8">
+  <div class="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] items-center">
+    <div class="hidden lg:block">
+      <div class="auth-grid-card p-8">
+        <div class="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+          Acesso protegido
+        </div>
+        <h1 class="mt-5 text-5xl font-display font-bold tracking-tight text-foreground">Entre no Studio e continue seu pipeline.</h1>
+        <p class="mt-5 max-w-xl text-[15px] leading-7 text-muted-foreground">
+          Seus projetos, etapas de producao e publicacoes ficam protegidos. Entre com seu usuario para abrir a area interna com seguranca e seguir de onde parou.
+        </p>
+        <div class="mt-8 grid gap-3 text-sm text-muted-foreground">
+          <div class="auth-metric"><strong>Sessao protegida</strong><span>Seus projetos internos ficam acessiveis apenas depois da autenticacao.</span></div>
+          <div class="auth-metric"><strong>Entrada direta no fluxo</strong><span>Depois do login, voce cai no dashboard para continuar a operacao.</span></div>
+          <div class="auth-metric"><strong>Acesso simples</strong><span>Se ainda nao tiver conta, voce pode criar seu usuario em poucos segundos.</span></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="w-full max-w-md lg:ml-auto">
-    <div class="card overflow-hidden border-border shadow-sm">
-      <div class="card-header">
-        <p class="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Login</p>
-        <h2 class="card-title text-2xl font-display">Acesse sua conta</h2>
-        <p class="card-description">Use seu usuário e senha para entrar no ambiente de projetos.</p>
-      </div>
-      <div class="card-content">
-        {% if form.errors %}
-        <div class="alert alert-info mb-4">
-          Usuário ou senha inválidos. Confira os dados e tente novamente.
+    <div class="w-full max-w-md lg:ml-auto">
+      <div class="card overflow-hidden border-border shadow-sm">
+        <div class="card-header">
+          <p class="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Login</p>
+          <h2 class="card-title text-2xl font-display">Acesse sua conta</h2>
+          <p class="card-description">Use seu usuario e senha para entrar no ambiente de projetos.</p>
         </div>
-        {% endif %}
-
-        <form method="post" action="{% url 'login' %}" class="space-y-4">
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{{ next|default:'/dashboard/' }}">
-
-          <div class="space-y-2">
-            <label class="label" for="id_username">Usuário</label>
-            <input class="input" id="id_username" name="username" type="text" autocomplete="username" required autofocus>
+        <div class="card-content">
+          {% if form.errors %}
+          <div class="alert alert-info mb-4">
+            Usuario ou senha invalidos. Confira os dados e tente novamente.
           </div>
+          {% endif %}
 
-          <div class="space-y-2">
-            <label class="label" for="id_password">Senha</label>
-            <input class="input" id="id_password" name="password" type="password" autocomplete="current-password" required>
+          <form method="post" action="{% url 'login' %}" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next|default:'/dashboard/' }}">
+
+            <div class="space-y-2">
+              <label class="label" for="id_username">Usuario</label>
+              <input class="input" id="id_username" name="username" type="text" autocomplete="username" required autofocus>
+            </div>
+
+            <div class="space-y-2">
+              <label class="label" for="id_password">Senha</label>
+              <input class="input" id="id_password" name="password" type="password" autocomplete="current-password" required>
+            </div>
+
+            <button type="submit" class="btn btn-default btn-lg w-full">Entrar no Studio</button>
+          </form>
+
+          <div class="mt-5 rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+            Primeira vez aqui? <a href="{% url 'register' %}" class="font-semibold text-primary">Crie sua conta</a>.
           </div>
-
-          <button type="submit" class="btn btn-default btn-lg w-full">Entrar no Studio</button>
-        </form>
+        </div>
       </div>
     </div>
   </div>

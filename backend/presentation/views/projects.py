@@ -9,12 +9,15 @@ import time
 import uuid
 
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import login
 from django.http import Http404, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
 from infrastructure.orm.repositories import DjangoProjectRepository
 from infrastructure.storage import get_storage
+from presentation.forms import StudioUserCreationForm
 
 # ── display constants ──────────────────────────────────────────
 
@@ -236,6 +239,23 @@ def _get_or_404(project_id: str) -> dict:
 
 def home(request):
     return render(request, 'home.html')
+
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = StudioUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, 'Conta criada com sucesso. Bem-vindo ao Studio.')
+            return redirect('dashboard')
+    else:
+        form = StudioUserCreationForm()
+
+    return render(request, 'auth/register.html', {'form': form})
 
 
 def dashboard(request):
