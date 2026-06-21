@@ -317,64 +317,7 @@
   }
 
   .product-body {
-    display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: 12px;
     padding: 14px;
-  }
-
-  .product-sidebar {
-    display: grid;
-    gap: 10px;
-    align-content: start;
-    padding: 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  .sidebar-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    color: #ffffff;
-    background: linear-gradient(135deg, #1d4ed8, #0891b2);
-    box-shadow: 0 12px 22px rgba(29, 78, 216, 0.22);
-  }
-
-  .sidebar-label {
-    color: #e2e8f0;
-    font-size: 12px;
-    font-weight: 800;
-    line-height: 1.4;
-  }
-
-  .sidebar-stack {
-    display: grid;
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  .sidebar-stack span {
-    display: block;
-    height: 10px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.10);
-  }
-
-  .sidebar-stack span:nth-child(1) {
-    width: 84%;
-  }
-
-  .sidebar-stack span:nth-child(2) {
-    width: 62%;
-  }
-
-  .sidebar-stack span:nth-child(3) {
-    width: 74%;
   }
 
   .workspace-panel {
@@ -1063,20 +1006,6 @@
         </div>
 
         <div class="product-body">
-          <aside class="product-sidebar" aria-hidden="true">
-            <div class="sidebar-badge">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                <path d="M4.25 4A2.25 2.25 0 002 6.25v7.5A2.25 2.25 0 004.25 16h7.5A2.25 2.25 0 0014 13.75v-.46l2.28 1.425A.75.75 0 0017.5 14.08V5.92a.75.75 0 00-1.22-.586L14 6.71v-.46A2.25 2.25 0 0011.75 4h-7.5z"/>
-              </svg>
-            </div>
-            <div class="sidebar-label">Automation run</div>
-            <div class="sidebar-stack">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </aside>
-
           <div class="workspace-panel">
             <div class="workspace-header">
               <div>
