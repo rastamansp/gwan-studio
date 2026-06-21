@@ -1,0 +1,43 @@
+<dialog id="modal-new" class="project-dialog">
+  <div class="project-dialog-shell">
+    <h2>Novo projeto</h2>
+    <p>Abra um workspace para receber videos, organizar a esteira e seguir com a producao.</p>
+
+    <form method="post" action="/projects/new/" class="project-form">
+      {% csrf_token %}
+
+      {% if form_error %}
+      <div class="project-error">{{ form_error }}</div>
+      {% endif %}
+
+      <div class="project-field">
+        <label for="name">Nome do projeto</label>
+        <input id="name" type="text" name="name" class="project-input" placeholder="Pedalada 200km - Serra Gaucha" autofocus>
+      </div>
+
+      <div class="project-field">
+        <label for="channel">Canal YouTube</label>
+        <input id="channel" type="text" name="channel_name" class="project-input" placeholder="@seucanal">
+      </div>
+
+      <div class="project-dialog-actions">
+        <button type="button" class="app-button-secondary" onclick="document.getElementById('modal-new').close()">
+          Cancelar
+        </button>
+        <button type="submit" class="app-button">Criar projeto</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script>
+  const projectDialog = document.getElementById('modal-new');
+
+  projectDialog.addEventListener('click', function(event) {
+    if (event.target === this) this.close();
+  });
+
+  {% if form_error %}
+  projectDialog.showModal();
+  {% endif %}
+</script>
