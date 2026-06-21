@@ -32,7 +32,8 @@ services:
       - SECRET_KEY=${SECRET_KEY:?defina SECRET_KEY nas Environment variables do Portainer}
       - DATABASE_URL=${DATABASE_URL:?defina DATABASE_URL (postgresql://...) no Portainer}
       # Com default de produção (sobrescreva no Portainer se necessário):
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-studio.gwan.cloud}
+      # inclui localhost/127.0.0.1 p/ o healthcheck interno do container nao cair em DisallowedHost
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-studio.gwan.cloud,localhost,127.0.0.1}
       - REDIS_URL=${REDIS_URL:-redis://cache.gwan.cloud:6379/0}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-s3.gwan.cloud}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-}
