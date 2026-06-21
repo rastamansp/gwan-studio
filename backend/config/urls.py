@@ -4,7 +4,8 @@ from django.urls import path
 from presentation.views import projects
 
 urlpatterns = [
-    path('', projects.project_list, name='project-list'),
+    path('', projects.home, name='home'),
+    path('projects/', projects.project_list, name='project-list'),
     path('projects/new/', projects.project_new, name='project-new'),
     path('projects/<str:project_id>/', projects.project_detail, name='project-detail'),
     # Sources step + F02 endpoints

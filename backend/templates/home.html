@@ -1,0 +1,1022 @@
+{% extends "base.html" %}
+{% block title %}Gwan Studio - Editor online para GoPro e YouTube{% endblock %}
+{% block main_class %}w-full overflow-hidden{% endblock %}
+
+{% block extra_head %}
+<style>
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .landing {
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+    color: #06111f;
+    background:
+      linear-gradient(180deg, rgba(238, 246, 255, 0.92) 0%, rgba(255, 255, 255, 1) 42%),
+      #f7fafc;
+  }
+
+  .landing-container {
+    width: min(1180px, calc(100% - 40px));
+    margin: 0 auto;
+  }
+
+  .landing-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(18px);
+  }
+
+  .landing-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    min-height: 72px;
+  }
+
+  .landing-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: #06111f;
+    text-decoration: none;
+    font-weight: 800;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    letter-spacing: 0;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #0b1220 0%, #1d4ed8 55%, #0891b2 100%);
+    box-shadow: 0 12px 28px rgba(29, 78, 216, 0.18);
+  }
+
+  .landing-links {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #475569;
+  }
+
+  .landing-links a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .landing-links a:hover {
+    color: #0f172a;
+  }
+
+  .landing-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 18px;
+    border-radius: 999px;
+    color: #ffffff;
+    background: #06111f;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .landing-hero {
+    position: relative;
+    padding: 54px 0 72px;
+  }
+
+  .landing-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 18% 2%, rgba(14, 165, 233, 0.18), transparent 28%),
+      radial-gradient(circle at 82% 18%, rgba(16, 185, 129, 0.13), transparent 24%);
+  }
+
+  .hero-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+    gap: 44px;
+    align-items: center;
+  }
+
+  .hero-copy {
+    min-width: 0;
+  }
+
+  .hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 26px;
+    padding: 8px 12px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hero-kicker span {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #0ea5e9;
+    box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.14);
+  }
+
+  .hero-brand {
+    margin: 0;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: clamp(58px, 8vw, 116px);
+    line-height: 0.86;
+    font-weight: 800;
+    color: #06111f;
+    letter-spacing: -0.055em;
+  }
+
+  .hero-statement {
+    margin: 22px 0 0;
+    max-width: 680px;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: clamp(30px, 3.4vw, 52px);
+    line-height: 1;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.035em;
+  }
+
+  .hero-statement strong {
+    color: #1d4ed8;
+    font-weight: inherit;
+  }
+
+  .hero-text {
+    margin: 24px 0 0;
+    max-width: 620px;
+    color: #475569;
+    font-size: 18px;
+    line-height: 1.75;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: 34px;
+  }
+
+  .primary-action,
+  .secondary-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    padding: 0 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .primary-action {
+    color: #ffffff;
+    background: linear-gradient(135deg, #06111f 0%, #1d4ed8 100%);
+    box-shadow: 0 18px 38px rgba(29, 78, 216, 0.20);
+  }
+
+  .secondary-action {
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(15, 23, 42, 0.10);
+  }
+
+  .hero-points {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 32px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .hero-points span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hero-points span::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #10b981;
+  }
+
+  .product-shot {
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 30px;
+    background: #07111f;
+    box-shadow:
+      0 32px 80px rgba(15, 23, 42, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+  }
+
+  .product-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .window-dots {
+    display: flex;
+    gap: 7px;
+  }
+
+  .window-dots i {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .product-body {
+    display: grid;
+    grid-template-columns: 0.88fr 1.12fr;
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .import-panel,
+  .output-panel,
+  .timeline-panel {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .import-panel {
+    padding: 16px;
+  }
+
+  .panel-label {
+    margin: 0 0 12px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .share-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 52px;
+    padding: 0 12px 0 16px;
+    border-radius: 14px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .share-input b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    color: #ffffff;
+    background: #1d4ed8;
+    flex: 0 0 auto;
+  }
+
+  .queue-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .queue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #dbeafe;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .queue-item em {
+    color: #38bdf8;
+    font-style: normal;
+    font-size: 12px;
+  }
+
+  .preview-panel {
+    min-width: 0;
+  }
+
+  .video-frame {
+    position: relative;
+    overflow: hidden;
+    min-height: 300px;
+    border-radius: 22px;
+    background:
+      linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.68)),
+      linear-gradient(140deg, #0ea5e9 0%, #0f172a 50%, #10b981 118%);
+  }
+
+  .video-frame::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.42;
+    background:
+      radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.46), transparent 18%),
+      linear-gradient(135deg, transparent 0 42%, rgba(255, 255, 255, 0.18) 42% 48%, transparent 48%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 72px);
+  }
+
+  .play-mark {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 999px;
+    color: #06111f;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  }
+
+  .video-caption {
+    position: absolute;
+    right: 20px;
+    bottom: 22px;
+    max-width: 250px;
+    color: #ffffff;
+    text-align: right;
+  }
+
+  .video-caption p {
+    margin: 0;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 26px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+
+  .video-caption small {
+    display: block;
+    margin-top: 8px;
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .output-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .output-panel {
+    padding: 14px;
+    color: #f8fafc;
+  }
+
+  .output-panel strong {
+    display: block;
+    font-size: 18px;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+  }
+
+  .output-panel span {
+    display: block;
+    margin-top: 6px;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .timeline-panel {
+    grid-column: 1 / -1;
+    padding: 14px;
+  }
+
+  .timeline-track {
+    display: grid;
+    grid-template-columns: 1.2fr 0.7fr 0.55fr 0.75fr 0.6fr;
+    gap: 7px;
+    height: 52px;
+  }
+
+  .timeline-track span {
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.82), rgba(37, 99, 235, 0.52));
+  }
+
+  .timeline-track span:nth-child(2) {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.72), rgba(20, 184, 166, 0.46));
+  }
+
+  .timeline-track span:nth-child(3) {
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.78), rgba(245, 158, 11, 0.48));
+  }
+
+  .timeline-track span:nth-child(4) {
+    background: linear-gradient(135deg, rgba(129, 140, 248, 0.72), rgba(37, 99, 235, 0.42));
+  }
+
+  .section {
+    padding: 74px 0;
+  }
+
+  .section-tight {
+    padding-top: 36px;
+  }
+
+  .section-heading {
+    max-width: 760px;
+  }
+
+  .eyebrow {
+    margin: 0 0 12px;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .section-title {
+    margin: 0;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: clamp(34px, 4.5vw, 64px);
+    line-height: 0.98;
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    color: #06111f;
+  }
+
+  .section-text {
+    margin: 18px 0 0;
+    max-width: 720px;
+    color: #475569;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  .process-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    margin-top: 34px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 24px;
+    background: rgba(15, 23, 42, 0.08);
+  }
+
+  .process-card {
+    min-height: 260px;
+    padding: 28px;
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .process-card span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    color: #ffffff;
+    background: #06111f;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-weight: 800;
+  }
+
+  .process-card h3 {
+    margin: 24px 0 0;
+    color: #06111f;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .process-card p {
+    margin: 12px 0 0;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .split-section {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 36px;
+    align-items: start;
+  }
+
+  .capability-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .capability-item {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 16px;
+    padding: 20px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .capability-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    color: #0f172a;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(16, 185, 129, 0.14));
+  }
+
+  .capability-item h3 {
+    margin: 0;
+    color: #06111f;
+    font-size: 18px;
+    font-weight: 850;
+    letter-spacing: -0.02em;
+  }
+
+  .capability-item p {
+    margin: 8px 0 0;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .time-card {
+    overflow: hidden;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #06111f 0%, #0f2f4a 54%, #063f3a 120%);
+    color: #f8fafc;
+    padding: 36px;
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.20);
+  }
+
+  .time-card h2 {
+    margin: 0;
+    max-width: 760px;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: clamp(34px, 4.8vw, 72px);
+    line-height: 0.96;
+    font-weight: 850;
+    letter-spacing: -0.05em;
+  }
+
+  .time-card p {
+    margin: 18px 0 0;
+    max-width: 680px;
+    color: #cbd5e1;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  .time-compare {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 30px;
+  }
+
+  .compare-box {
+    min-height: 210px;
+    border-radius: 22px;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+  }
+
+  .compare-box strong {
+    display: block;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 42px;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+  }
+
+  .compare-box span {
+    display: block;
+    margin-top: 14px;
+    color: #dbeafe;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .final-cta {
+    position: relative;
+    overflow: hidden;
+    border-radius: 30px;
+    padding: 42px;
+    background:
+      radial-gradient(circle at 15% 16%, rgba(14, 165, 233, 0.18), transparent 28%),
+      linear-gradient(180deg, #ffffff, #f8fafc);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  }
+
+  .final-cta h2 {
+    margin: 0;
+    max-width: 780px;
+    color: #06111f;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: clamp(34px, 4vw, 58px);
+    line-height: 1;
+    font-weight: 850;
+    letter-spacing: -0.045em;
+  }
+
+  .final-cta p {
+    margin: 18px 0 0;
+    max-width: 670px;
+    color: #475569;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  @media (max-width: 1080px) {
+    .hero-grid,
+    .split-section {
+      grid-template-columns: 1fr;
+    }
+
+    .product-shot {
+      max-width: 760px;
+    }
+
+    .process-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .landing-container {
+      width: min(100% - 28px, 1180px);
+    }
+
+    .landing-nav {
+      min-height: 64px;
+    }
+
+    .landing-links {
+      display: none;
+    }
+
+    .landing-cta {
+      min-height: 38px;
+      padding: 0 14px;
+    }
+
+    .landing-hero {
+      padding: 34px 0 52px;
+    }
+
+    .hero-brand {
+      font-size: clamp(54px, 19vw, 78px);
+    }
+
+    .hero-statement {
+      font-size: clamp(30px, 10vw, 42px);
+    }
+
+    .hero-text,
+    .section-text,
+    .time-card p,
+    .final-cta p {
+      font-size: 16px;
+    }
+
+    .primary-action,
+    .secondary-action {
+      width: 100%;
+    }
+
+    .product-body,
+    .output-grid,
+    .process-grid,
+    .time-compare {
+      grid-template-columns: 1fr;
+    }
+
+    .video-frame {
+      min-height: 240px;
+    }
+
+    .video-caption {
+      left: 18px;
+      right: 18px;
+      text-align: left;
+    }
+
+    .section {
+      padding: 52px 0;
+    }
+
+    .process-card {
+      min-height: auto;
+    }
+
+    .time-card,
+    .final-cta {
+      padding: 26px;
+      border-radius: 24px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block header %}
+<header class="landing-header">
+  <div class="landing-container">
+    <nav class="landing-nav" aria-label="Navegacao principal">
+      <a href="/" class="landing-brand">
+        <span class="brand-mark">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+            <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
+          </svg>
+        </span>
+        <span>Gwan Studio</span>
+      </a>
+
+      <div class="landing-links">
+        <a href="#produto">Produto</a>
+        <a href="#fluxo">Fluxo</a>
+        <a href="#automacao">Automacao</a>
+      </div>
+
+      <a href="/projects/" class="landing-cta">Abrir Studio</a>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="landing">
+  <section class="landing-hero" id="produto">
+    <div class="landing-container hero-grid">
+      <div class="hero-copy">
+        <div class="hero-kicker"><span></span> GoPro in. YouTube out.</div>
+        <h1 class="hero-brand">Gwan Studio</h1>
+        <p class="hero-statement">Da GoPro ao YouTube <strong>em um clique.</strong></p>
+        <p class="hero-text">
+          Um editor online para creators que gravam muito e nao querem viver dentro de timelines. Compartilhe o link dos videos, e o Studio baixa, organiza, edita, cria teaser, thumbnail, SEO e prepara a publicacao.
+        </p>
+
+        <div class="hero-actions">
+          <a href="/projects/" class="primary-action">Comecar um projeto</a>
+          <a href="#fluxo" class="secondary-action">Ver como funciona</a>
+        </div>
+
+        <div class="hero-points" aria-label="Principais beneficios">
+          <span>Importacao por link</span>
+          <span>Pipeline automatico</span>
+          <span>Publicacao assistida</span>
+        </div>
+      </div>
+
+      <div class="product-shot" aria-label="Previa da interface do Gwan Studio">
+        <div class="product-topbar">
+          <div class="window-dots" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </div>
+          <span>Production run 04:12</span>
+        </div>
+
+        <div class="product-body">
+          <div class="import-panel">
+            <p class="panel-label">Entrada</p>
+            <div class="share-input">
+              <span>gopro.com/share/adventure-ride</span>
+              <b>Go</b>
+            </div>
+
+            <div class="queue-list">
+              <div class="queue-item"><span>Baixando fontes</span><em>12 clips</em></div>
+              <div class="queue-item"><span>Detectando ordem</span><em>98%</em></div>
+              <div class="queue-item"><span>Separando melhores cenas</span><em>AI</em></div>
+              <div class="queue-item"><span>Preparando YouTube</span><em>SEO</em></div>
+            </div>
+          </div>
+
+          <div class="preview-panel">
+            <div class="video-frame">
+              <div class="play-mark">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-7 h-7">
+                  <path d="M6.3 3.841A1.5 1.5 0 004 5.11v9.78a1.5 1.5 0 002.3 1.269l7.826-4.89a1.5 1.5 0 000-2.538L6.3 3.84z"/>
+                </svg>
+              </div>
+              <div class="video-caption">
+                <p>Pedal na serra</p>
+                <small>Final + teaser + thumbnail</small>
+              </div>
+            </div>
+
+            <div class="output-grid">
+              <div class="output-panel">
+                <strong>08:42</strong>
+                <span>video final editado</span>
+              </div>
+              <div class="output-panel">
+                <strong>03</strong>
+                <span>thumbs prontas</span>
+              </div>
+              <div class="output-panel">
+                <strong>94</strong>
+                <span>score SEO sugerido</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline-panel">
+            <p class="panel-label">Linha de producao</p>
+            <div class="timeline-track" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-tight" id="fluxo">
+    <div class="landing-container">
+      <div class="section-heading">
+        <p class="eyebrow">Fluxo single click</p>
+        <h2 class="section-title">O trabalho repetitivo vira uma esteira de producao.</h2>
+        <p class="section-text">
+          A ideia nao e substituir a visao do creator. E tirar do caminho as tarefas que drenam tempo: baixar midia, ordenar takes, renderizar, criar assets, escrever SEO e subir tudo no YouTube.
+        </p>
+      </div>
+
+      <div class="process-grid">
+        <article class="process-card">
+          <span>01</span>
+          <h3>Compartilhe</h3>
+          <p>Cole o link dos videos gravados e deixe o Studio preparar a coleta dos arquivos brutos.</p>
+        </article>
+        <article class="process-card">
+          <span>02</span>
+          <h3>Monte</h3>
+          <p>O pipeline organiza clipes, mescla cenas e prepara uma versao final coerente para video longo.</p>
+        </article>
+        <article class="process-card">
+          <span>03</span>
+          <h3>Crie assets</h3>
+          <p>Teaser, thumbnails, titulo, descricao e tags nascem juntos, com contexto do proprio material.</p>
+        </article>
+        <article class="process-card">
+          <span>04</span>
+          <h3>Publique</h3>
+          <p>O YouTube recebe o pacote pronto para revisao, aprovacao e rotina consistente de canal.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="automacao">
+    <div class="landing-container split-section">
+      <div class="section-heading">
+        <p class="eyebrow">Produto para creators reais</p>
+        <h2 class="section-title">Bonito por fora. Operacional por dentro.</h2>
+        <p class="section-text">
+          A homepage precisa vender a promessa, mas o produto por tras dela foi pensado para uma dor concreta: gravar e publicar com frequencia sem transformar cada video em um turno inteiro de edicao.
+        </p>
+      </div>
+
+      <div class="capability-list">
+        <article class="capability-item">
+          <div class="capability-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path d="M4.25 4A2.25 2.25 0 002 6.25v7.5A2.25 2.25 0 004.25 16h7.5A2.25 2.25 0 0014 13.75v-.46l2.28 1.425A.75.75 0 0017.5 14.08V5.92a.75.75 0 00-1.22-.586L14 6.71v-.46A2.25 2.25 0 0011.75 4h-7.5z"/>
+            </svg>
+          </div>
+          <div>
+            <h3>Entrada pensada para camera de acao</h3>
+            <p>O ponto de partida e simples: muito material bruto, gravado em movimento, vindo de links compartilhados.</p>
+          </div>
+        </article>
+
+        <article class="capability-item">
+          <div class="capability-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path fill-rule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm8.75-4.25a.75.75 0 00-1.5 0v3.5h-3.5a.75.75 0 000 1.5h3.5v3.5a.75.75 0 001.5 0v-3.5h3.5a.75.75 0 000-1.5h-3.5v-3.5z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div>
+            <h3>Automacao sem perder criterio</h3>
+            <p>O Studio encadeia decisoes de edicao, export, teaser, thumbnail e SEO em um fluxo revisavel.</p>
+          </div>
+        </article>
+
+        <article class="capability-item">
+          <div class="capability-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path d="M3 4.75A2.75 2.75 0 015.75 2h8.5A2.75 2.75 0 0117 4.75v10.5A2.75 2.75 0 0114.25 18h-8.5A2.75 2.75 0 013 15.25V4.75zm7 1.5a.75.75 0 01.75.75v2.25H13a.75.75 0 010 1.5h-2.25V13a.75.75 0 01-1.5 0v-2.25H7a.75.75 0 010-1.5h2.25V7A.75.75 0 0110 6.25z"/>
+            </svg>
+          </div>
+          <div>
+            <h3>Publicacao como resultado final</h3>
+            <p>A saida nao e so um arquivo renderizado. E um pacote completo para o canal crescer com previsibilidade.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="landing-container">
+      <div class="time-card">
+        <h2>O valor real e devolver horas para quem cria.</h2>
+        <p>
+          A promessa do Gwan Studio e transformar uma rotina pesada de editor em uma experiencia de producao assistida. O creator continua decidindo, mas para de carregar o trabalho mecanico nas costas.
+        </p>
+
+        <div class="time-compare">
+          <div class="compare-box">
+            <strong>Antes</strong>
+            <span>Baixar arquivos, separar clipes, abrir editor, montar, exportar, criar thumbnail, escrever SEO e publicar manualmente.</span>
+          </div>
+          <div class="compare-box">
+            <strong>Depois</strong>
+            <span>Compartilhar o link, acompanhar a esteira e revisar o pacote final antes de publicar no YouTube.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="landing-container">
+      <div class="final-cta">
+        <h2>Uma homepage de produto para um produto que economiza tempo de verdade.</h2>
+        <p>
+          O Gwan Studio posiciona a automacao de video como uma ferramenta premium para creators que gravam com camera de acao e precisam publicar mais, melhor e com menos friccao.
+        </p>
+        <div class="hero-actions">
+          <a href="/projects/" class="primary-action">Abrir area de projetos</a>
+          <a href="/api/health/" class="secondary-action">Ver status da API</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -234,6 +234,10 @@ def _get_or_404(project_id: str) -> dict:
 
 # ── Project list / create ──────────────────────────────────────
 
+def home(request):
+    return render(request, 'home.html')
+
+
 def project_list(request):
     projects = [_to_display(p) for p in _repo().list()]
     return render(request, 'projects/list.html', {'projects': projects})
@@ -252,7 +256,7 @@ def project_new(request):
         from application.projects.use_cases import CreateProject
         project = CreateProject(_repo()).execute(name, channel_name)
         return redirect(f'/projects/{project.id}/')
-    return redirect('/')
+    return redirect('/projects/')
 
 # ── Project detail + step views ────────────────────────────────
 
