@@ -4,7 +4,10 @@
 
 {% block extra_head %}
 <style>
-  html,
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     overflow-x: hidden;
   }
@@ -455,6 +458,16 @@
     font-weight: 800;
   }
 
+  .share-url {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    letter-spacing: -0.01em;
+    opacity: 0.96;
+  }
+
   .share-input b {
     display: inline-flex;
     align-items: center;
@@ -519,25 +532,28 @@
 
   .play-mark {
     position: absolute;
-    left: 20px;
-    bottom: 20px;
+    left: 24px;
+    bottom: 26px;
     display: grid;
     place-items: center;
-    width: 52px;
-    height: 52px;
+    width: 54px;
+    height: 54px;
     border-radius: 999px;
     color: #06111f;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.30);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
+    z-index: 2;
   }
 
   .video-caption {
     position: absolute;
-    right: 18px;
-    bottom: 18px;
-    max-width: 250px;
+    left: 104px;
+    right: 24px;
+    bottom: 24px;
     color: #ffffff;
     text-align: right;
+    z-index: 2;
   }
 
   .video-caption p {
@@ -859,6 +875,41 @@
     line-height: 1.68;
   }
 
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 14px;
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .status-chip::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #10b981;
+    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.14);
+  }
+
+  .status-chip small {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
   @media (max-width: 1080px) {
     .hero-grid,
     .split-section {
@@ -954,7 +1005,7 @@
 {% block header %}
 <header class="landing-header">
   <div class="landing-container">
-    <nav class="landing-nav" aria-label="Navegacao principal">
+    <nav class="landing-nav" aria-label="Navegação principal">
       <a href="/" class="landing-brand">
         <span class="brand-mark">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
@@ -970,7 +1021,7 @@
       <div class="landing-links">
         <a href="#produto">Produto</a>
         <a href="#fluxo">Fluxo</a>
-        <a href="#automacao">Automacao</a>
+        <a href="#automacao">Automação</a>
       </div>
 
       <a href="/projects/" class="landing-cta">Abrir Studio</a>
@@ -988,7 +1039,7 @@
         <h1 class="hero-brand">Gwan Studio</h1>
         <p class="hero-statement">Da GoPro ao YouTube <strong>em um clique.</strong></p>
         <p class="hero-text">
-          Um sistema de producao para creators que gravam muito e nao querem perder dias em pos. Compartilhe o link dos videos e o Studio baixa, organiza, edita, cria teaser, thumbnail, SEO e deixa a publicacao pronta para revisao.
+          Você grava, compartilha o link e segue em frente. O Studio baixa, organiza, edita, cria teaser, thumbnail, SEO e deixa a publicação pronta para revisão.
         </p>
 
         <div class="hero-actions">
@@ -996,10 +1047,10 @@
           <a href="#fluxo" class="secondary-action">Ver como funciona</a>
         </div>
 
-        <div class="hero-points" aria-label="Principais beneficios">
-          <span>Importacao por link</span>
-          <span>Pipeline automatico</span>
-          <span>Publicacao assistida</span>
+        <div class="hero-points" aria-label="Principais benefícios">
+          <span>Importação por link</span>
+          <span>Pipeline automático</span>
+          <span>Publicação assistida</span>
         </div>
       </div>
 
@@ -1042,7 +1093,7 @@
               <div class="import-panel">
                 <p class="panel-label">Entrada</p>
                 <div class="share-input">
-                  <span>gopro.com/share/adventure-ride</span>
+                  <span class="share-url">gopro.com/share/adventure-ride</span>
                   <b>Go</b>
                 </div>
 
@@ -1085,7 +1136,7 @@
             </div>
 
             <div class="timeline-panel">
-              <p class="panel-label">Linha de producao</p>
+              <p class="panel-label">Linha de produção</p>
               <div class="timeline-track" aria-hidden="true">
                 <span></span><span></span><span></span><span></span><span></span>
               </div>
@@ -1100,9 +1151,9 @@
     <div class="landing-container">
       <div class="section-heading">
         <p class="eyebrow">Fluxo single click</p>
-        <h2 class="section-title">O trabalho repetitivo vira uma esteira de producao.</h2>
+        <h2 class="section-title">O trabalho repetitivo vira uma esteira de produção.</h2>
         <p class="section-text">
-          A ideia nao e substituir a visao do creator. E tirar do caminho as tarefas que drenam tempo: baixar midia, ordenar takes, renderizar, criar assets, escrever SEO e subir tudo no YouTube.
+          Você continua no controle criativo. O Studio tira do caminho as tarefas que drenam tempo: baixar mídia, ordenar takes, renderizar, criar assets, escrever SEO e subir tudo no YouTube.
         </p>
       </div>
 
@@ -1110,22 +1161,22 @@
         <article class="process-card">
           <span>01</span>
           <h3>Compartilhe</h3>
-          <p>Cole o link dos videos gravados e deixe o Studio preparar a coleta dos arquivos brutos.</p>
+          <p>Cole o link dos vídeos gravados e deixe o Studio preparar a coleta dos arquivos brutos.</p>
         </article>
         <article class="process-card">
           <span>02</span>
           <h3>Monte</h3>
-          <p>O pipeline organiza clipes, mescla cenas e prepara uma versao final coerente para video longo.</p>
+          <p>O pipeline organiza clipes, mescla cenas e prepara uma versão final coerente para vídeo longo.</p>
         </article>
         <article class="process-card">
           <span>03</span>
           <h3>Crie assets</h3>
-          <p>Teaser, thumbnails, titulo, descricao e tags nascem juntos, com contexto do proprio material.</p>
+          <p>Teaser, thumbnails, título, descrição e tags nascem juntos, com contexto do próprio material.</p>
         </article>
         <article class="process-card">
           <span>04</span>
           <h3>Publique</h3>
-          <p>O YouTube recebe o pacote pronto para revisao, aprovacao e rotina consistente de canal.</p>
+          <p>O YouTube recebe o pacote pronto para revisão, aprovação e uma rotina consistente de canal.</p>
         </article>
       </div>
     </div>
@@ -1137,7 +1188,7 @@
         <p class="eyebrow">Produto para creators reais</p>
         <h2 class="section-title">Bonito por fora. Operacional por dentro.</h2>
         <p class="section-text">
-          A homepage precisa vender a promessa, mas o produto por tras dela foi pensado para uma dor concreta: gravar e publicar com frequencia sem transformar cada video em um turno inteiro de edicao.
+          Você não precisa trocar horas de edição por frequência. O produto foi desenhado para ajudar a gravar, organizar e publicar mais sem transformar cada vídeo em um turno inteiro de edição.
         </p>
       </div>
 
@@ -1149,8 +1200,8 @@
             </svg>
           </div>
           <div>
-            <h3>Entrada pensada para camera de acao</h3>
-            <p>O ponto de partida e simples: muito material bruto, gravado em movimento, vindo de links compartilhados.</p>
+            <h3>Entrada pensada para câmera de ação</h3>
+            <p>O ponto de partida é simples: muito material bruto, gravado em movimento, vindo de links compartilhados.</p>
           </div>
         </article>
 
@@ -1161,8 +1212,8 @@
             </svg>
           </div>
           <div>
-            <h3>Automacao sem perder criterio</h3>
-            <p>O Studio encadeia decisoes de edicao, export, teaser, thumbnail e SEO em um fluxo revisavel.</p>
+            <h3>Automação sem perder critério</h3>
+            <p>O Studio encadeia decisões de edição, export, teaser, thumbnail e SEO em um fluxo revisável.</p>
           </div>
         </article>
 
@@ -1173,8 +1224,8 @@
             </svg>
           </div>
           <div>
-            <h3>Publicacao como resultado final</h3>
-            <p>A saida nao e so um arquivo renderizado. E um pacote completo para o canal crescer com previsibilidade.</p>
+            <h3>Publicação como resultado final</h3>
+            <p>A saída não é só um arquivo renderizado. É um pacote completo para o seu canal crescer com previsibilidade.</p>
           </div>
         </article>
       </div>
@@ -1184,9 +1235,9 @@
   <section class="section">
     <div class="landing-container">
       <div class="time-card">
-        <h2>O valor real e devolver horas para quem cria.</h2>
+        <h2>O valor real é devolver horas para quem cria.</h2>
         <p>
-          A promessa do Gwan Studio e transformar uma rotina pesada de editor em uma experiencia de producao assistida. O creator continua decidindo, mas para de carregar o trabalho mecanico nas costas.
+          Você continua decidindo o que vai ao ar. O Gwan Studio assume a parte mecânica da produção para que seu tempo volte para a criação.
         </p>
 
         <div class="time-compare">
@@ -1206,13 +1257,16 @@
   <section class="section">
     <div class="landing-container">
       <div class="final-cta">
-        <h2>Uma homepage de produto para um produto que economiza tempo de verdade.</h2>
+        <h2>Publique mais sem transformar sua rotina em pós-produção infinita.</h2>
         <p>
-          O Gwan Studio posiciona a automacao de video como uma ferramenta premium para creators que gravam com camera de acao e precisam publicar mais, melhor e com menos friccao.
+          O Gwan Studio foi pensado para creators que gravam com câmera de ação e querem publicar mais, melhor e com muito menos fricção.
         </p>
         <div class="hero-actions">
-          <a href="/projects/" class="primary-action">Abrir area de projetos</a>
-          <a href="/api/health/" class="secondary-action">Ver status da API</a>
+          <a href="/projects/" class="primary-action">Abrir área de projetos</a>
+          <div class="status-chip" aria-label="API online">
+            API online
+            <small>saúde operacional</small>
+          </div>
         </div>
       </div>
     </div>
