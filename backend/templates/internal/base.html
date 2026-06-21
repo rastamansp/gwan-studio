@@ -102,6 +102,14 @@
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     background: #ffffff;
+    min-width: 0;
+    max-width: 220px;
+    overflow: hidden;
+  }
+
+  .app-user-copy {
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .app-user strong {
@@ -110,9 +118,12 @@
     font-size: 12px;
     font-weight: 800;
     line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .app-user span {
+  .app-user-copy span {
     display: block;
     margin-top: 3px;
     color: #64748b;
@@ -128,6 +139,9 @@
     place-items: center;
     width: 28px;
     height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    flex: 0 0 28px;
     border-radius: 999px;
     color: #ffffff;
     background: #1d4ed8;
