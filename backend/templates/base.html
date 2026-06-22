@@ -183,6 +183,93 @@
     .alert-info    { border-color:hsl(217 91% 60%/.3); background:hsl(217 91% 60%/.07); color:hsl(217 91% 30%); }
     .dark .alert-info { background:hsl(217 91% 60%/.15); color:hsl(217 91% 80%); border-color:hsl(217 91% 60%/.2); }
 
+    /* Toasts */
+    .toast-stack {
+      position: fixed;
+      top: 5.25rem;
+      right: 1.25rem;
+      z-index: 80;
+      display: grid;
+      gap: 0.75rem;
+      width: min(360px, calc(100vw - 2rem));
+    }
+    .toast {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 0.875rem;
+      align-items: start;
+      padding: 0.95rem 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+      backdrop-filter: blur(18px);
+    }
+    .dark .toast {
+      background: rgba(15, 23, 42, 0.92);
+      border-color: rgba(148, 163, 184, 0.2);
+      box-shadow: 0 18px 42px rgba(2, 6, 23, 0.42);
+    }
+    .toast-indicator {
+      width: 10px;
+      height: 10px;
+      margin-top: 0.3rem;
+      border-radius: 999px;
+      background: #38bdf8;
+      box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.12);
+    }
+    .toast-success .toast-indicator {
+      background: #10b981;
+      box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.14);
+    }
+    .toast-error .toast-indicator {
+      background: #ef4444;
+      box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.14);
+    }
+    .toast-warning .toast-indicator {
+      background: #f59e0b;
+      box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.14);
+    }
+    .toast-copy strong {
+      display: block;
+      color: #06111f;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .dark .toast-copy strong {
+      color: #f8fafc;
+    }
+    .toast-copy p {
+      margin: 0.2rem 0 0;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .dark .toast-copy p {
+      color: #cbd5e1;
+    }
+    .toast-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      margin: -0.15rem -0.2rem 0 0;
+      border: 0;
+      border-radius: 999px;
+      color: #64748b;
+      background: transparent;
+      cursor: pointer;
+    }
+    .toast-close:hover {
+      background: rgba(148, 163, 184, 0.12);
+      color: #0f172a;
+    }
+    .dark .toast-close:hover {
+      color: #f8fafc;
+    }
+
     /* ── Separator ──────────────────────────────────────────── */
     .separator { background:hsl(var(--border)); flex-shrink:0; }
     .separator-h { height:1px; width:100%; }
@@ -285,9 +372,28 @@
   {% endblock %}
 
   {% if messages %}
-  <div class="max-w-6xl mx-auto px-5 mt-4 space-y-2">
+  <div class="toast-stack" aria-live="polite" aria-label="Notificacoes">
     {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    <div
+      class="toast {% if 'success' in message.tags %}toast-success{% elif 'error' in message.tags or 'danger' in message.tags %}toast-error{% elif 'warning' in message.tags %}toast-warning{% else %}toast-info{% endif %}"
+      x-data="{ open: true }"
+      x-init="setTimeout(() => open = false, 4200)"
+      x-show="open"
+      x-transition.opacity.duration.250ms
+      x-cloak
+    >
+      <span class="toast-indicator" aria-hidden="true"></span>
+      <div class="toast-copy">
+        <strong>
+          {% if 'success' in message.tags %}Tudo certo
+          {% elif 'error' in message.tags or 'danger' in message.tags %}Algo deu errado
+          {% elif 'warning' in message.tags %}Atencao
+          {% else %}Aviso{% endif %}
+        </strong>
+        <p>{{ message }}</p>
+      </div>
+      <button type="button" class="toast-close" @click="open = false" aria-label="Fechar notificacao">×</button>
+    </div>
     {% endfor %}
   </div>
   {% endif %}

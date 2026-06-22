@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.urls import path
@@ -9,6 +10,8 @@ from presentation.views import projects
 
 urlpatterns = [
     path('', projects.home, name='home'),
+    path('admin/', admin.site.urls),
+    path('register/', projects.register, name='register'),
     path(
         'login/',
         auth_views.LoginView.as_view(

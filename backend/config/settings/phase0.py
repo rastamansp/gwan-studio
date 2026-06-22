@@ -14,6 +14,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
 
 INSTALLED_APPS = [
     'daphne',  # first — overrides runserver to use ASGI/Daphne (WebSocket support)
+    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.staticfiles',

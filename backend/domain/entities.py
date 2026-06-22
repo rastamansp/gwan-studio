@@ -9,6 +9,7 @@ class Project:
     name: str
     channel_name: str
     phase: str
+    owner_id: Optional[int] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
 

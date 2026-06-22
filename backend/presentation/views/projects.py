@@ -9,12 +9,15 @@ import time
 import uuid
 
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import login
 from django.http import Http404, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
 from infrastructure.orm.repositories import DjangoProjectRepository
 from infrastructure.storage import get_storage
+from presentation.forms import StudioUserCreationForm
 
 # ── display constants ──────────────────────────────────────────
 
@@ -179,6 +182,18 @@ def _repo():
     return DjangoProjectRepository()
 
 
+def _user_repo(user):
+    return DjangoProjectRepository(owner=user)
+
+
+def _project_obj_or_404(request, project_id: str):
+    from studio.models import ProjectModel
+    try:
+        return ProjectModel.objects.get(id=project_id, owner=request.user)
+    except ProjectModel.DoesNotExist:
+        raise Http404
+
+
 def _to_display(project, sources: list[dict] | None = None) -> dict:
     if sources is None:
         sources = _list_sources_display(project.id)
@@ -226,9 +241,10 @@ def _step_ctx(pd: dict, active_key: str, extra: dict | None = None) -> dict:
     return ctx
 
 
-def _get_or_404(project_id: str) -> dict:
+def _get_or_404(project_id: str, user=None) -> dict:
     try:
-        return _to_display(_repo().get(project_id))
+        repo = _user_repo(user) if user is not None else _repo()
+        return _to_display(repo.get(project_id))
     except Exception:
         raise Http404
 
@@ -238,13 +254,30 @@ def home(request):
     return render(request, 'home.html')
 
 
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = StudioUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, 'Conta criada com sucesso. Bem-vindo ao Studio.')
+            return redirect('dashboard')
+    else:
+        form = StudioUserCreationForm()
+
+    return render(request, 'auth/register.html', {'form': form})
+
+
 def dashboard(request):
-    projects = [_to_display(p) for p in _repo().list()]
+    projects = [_to_display(p) for p in _user_repo(request.user).list()]
     return render(request, 'dashboard.html', {'projects': projects})
 
 
 def project_list(request):
-    projects = [_to_display(p) for p in _repo().list()]
+    projects = [_to_display(p) for p in _user_repo(request.user).list()]
     return render(request, 'projects/list.html', {'projects': projects})
 
 
@@ -253,20 +286,25 @@ def project_new(request):
         name = request.POST.get('name', '').strip()
         channel_name = request.POST.get('channel_name', '').strip()
         if not name:
-            projects = [_to_display(p) for p in _repo().list()]
+            projects = [_to_display(p) for p in _user_repo(request.user).list()]
             return render(request, 'projects/list.html', {
                 'projects': projects,
                 'form_error': 'O nome do projeto é obrigatório.',
             })
         from application.projects.use_cases import CreateProject
-        project = CreateProject(_repo()).execute(name, channel_name)
+        project = CreateProject(_user_repo(request.user)).execute(
+            name,
+            channel_name,
+            owner_id=request.user.id,
+        )
         return redirect(f'/projects/{project.id}/')
     return redirect('/projects/')
 
 # ── Project detail + step views ────────────────────────────────
 
 def project_detail(request, project_id):
-    pd = _get_or_404(project_id)
+    _project_obj_or_404(request, project_id)
+    pd = _get_or_404(project_id, request.user)
     sources = _list_sources_display(project_id)
     ctx = _step_ctx(pd, 'sources', {
         'sources': sources,
@@ -276,7 +314,8 @@ def project_detail(request, project_id):
 
 
 def sources_step(request, project_id):
-    pd = _get_or_404(project_id)
+    _project_obj_or_404(request, project_id)
+    pd = _get_or_404(project_id, request.user)
     sources = _list_sources_display(project_id)
     extra = {'sources': sources}
     if request.htmx:
@@ -341,6 +380,7 @@ def _merge_template_and_ctx(project_id: str) -> tuple[str, dict]:
 
 
 def merge_step(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, extra = _merge_template_and_ctx(project_id)
     pd = extra['project']
     if request.htmx:
@@ -413,11 +453,8 @@ def merge_start(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
 
-    from studio.models import SourceModel, JobModel, ProjectModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    from studio.models import SourceModel, JobModel
+    project_obj = _project_obj_or_404(request, project_id)
 
     # source_order: lista de IDs enviada pelo frontend (drag-drop)
     raw_order = request.POST.get('source_order', '[]')
@@ -437,7 +474,7 @@ def merge_start(request, project_id):
     if not sources:
         # Sem sources — retorna editor com erro
         template, ctx = 'merge/_editor.html', {
-            'project': _get_or_404(project_id),
+            'project': _get_or_404(project_id, request.user),
             'sources': [],
             'sources_json': '[]',
             'job_error': 'Adicione pelo menos uma fonte antes de fazer o merge.',
@@ -464,7 +501,7 @@ def merge_start(request, project_id):
     )
     t.start()
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'merge/_running.html', {
         'project': pd,
         'sources': _list_sources_display(project_id),
@@ -474,6 +511,7 @@ def merge_start(request, project_id):
 
 def merge_status(request, project_id):
     """Polling HTMX — retorna o template adequado ao estado atual do job."""
+    _project_obj_or_404(request, project_id)
     template, ctx = _merge_template_and_ctx(project_id)
     return render(request, template, ctx)
 
@@ -514,6 +552,7 @@ def _export_template_and_ctx(project_id: str) -> tuple[str, dict]:
 
 
 def export_step(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, extra = _export_template_and_ctx(project_id)
     pd = extra['project']
     if request.htmx:
@@ -593,12 +632,8 @@ def _run_export_job(
 def export_start(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-
-    from studio.models import ProjectModel, JobModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    from studio.models import JobModel
+    project_obj = _project_obj_or_404(request, project_id)
 
     codec      = request.POST.get('codec', 'copy').strip()
     resolution = request.POST.get('resolution', 'original').strip()
@@ -625,7 +660,7 @@ def export_start(request, project_id):
     )
     t.start()
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'export/_running.html', {
         'project': pd,
         'job': _job_display(job),
@@ -633,11 +668,13 @@ def export_start(request, project_id):
 
 
 def export_status(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, ctx = _export_template_and_ctx(project_id)
     return render(request, template, ctx)
 
 
 def export_download(request, project_id):
+    _project_obj_or_404(request, project_id)
     from django.http import FileResponse, Http404, HttpResponseRedirect
     storage = get_storage()
     final_key = f'studio/{project_id}/final/final.mp4'
@@ -702,6 +739,7 @@ def _thumbnail_template_and_ctx(project_id: str) -> tuple[str, dict]:
 
 
 def thumbnail_step(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, extra = _thumbnail_template_and_ctx(project_id)
     pd = extra['project']
     if request.htmx:
@@ -824,12 +862,8 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
 def thumbnail_generate(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-
-    from studio.models import ProjectModel, JobModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    from studio.models import JobModel
+    project_obj = _project_obj_or_404(request, project_id)
 
     job = JobModel.objects.create(
         project=project_obj,
@@ -842,7 +876,7 @@ def thumbnail_generate(request, project_id):
         daemon=True,
     ).start()
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'thumbnail/_running.html', {
         'project': pd,
         'job': _job_display(job),
@@ -850,6 +884,7 @@ def thumbnail_generate(request, project_id):
 
 
 def thumbnail_status(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, ctx = _thumbnail_template_and_ctx(project_id)
     return render(request, template, ctx)
 
@@ -857,6 +892,7 @@ def thumbnail_status(request, project_id):
 def thumbnail_select(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
 
     from studio.models import ThumbnailModel
     variant = request.POST.get('variant', '').strip().upper()
@@ -871,6 +907,7 @@ def thumbnail_select(request, project_id):
 
 
 def thumbnail_image(request, project_id, variant):
+    _project_obj_or_404(request, project_id)
     from django.http import FileResponse, HttpResponseRedirect
     variant = variant.upper()
     if variant not in ('A', 'B', 'C'):
@@ -934,6 +971,7 @@ def _seo_template_and_ctx(project_id: str) -> tuple[str, dict]:
 
 
 def seo_step(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, extra = _seo_template_and_ctx(project_id)
     pd = extra['project']
     if request.htmx:
@@ -1030,12 +1068,10 @@ def _run_seo_job(job_id: str, project_id: str, project_name: str,
 def seo_generate(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
 
-    from studio.models import ProjectModel, JobModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    from studio.models import JobModel
+    project_obj = _project_obj_or_404(request, project_id)
 
     context = request.POST.get('context', '').strip()
 
@@ -1046,11 +1082,12 @@ def seo_generate(request, project_id):
         daemon=True,
     ).start()
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'seo/_running.html', {'project': pd, 'job': _job_display(job)})
 
 
 def seo_status(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, ctx = _seo_template_and_ctx(project_id)
     return render(request, template, ctx)
 
@@ -1058,6 +1095,7 @@ def seo_status(request, project_id):
 def seo_save(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
 
     from studio.models import SeoMetadataModel
     seo, _ = SeoMetadataModel.objects.get_or_create(project_id=project_id)
@@ -1076,13 +1114,14 @@ def seo_save(request, project_id):
     seo.approved    = False
     seo.save(update_fields=['title', 'description', 'tags', 'approved', 'updated_at'])
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'seo/_editor.html', {'project': pd, 'seo': _seo_display(seo)})
 
 
 def seo_approve(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
 
     from studio.models import SeoMetadataModel, ProjectModel
     seo = _get_seo(project_id)
@@ -1093,7 +1132,7 @@ def seo_approve(request, project_id):
     seo.save(update_fields=['approved', 'updated_at'])
     ProjectModel.objects.filter(id=project_id).update(phase='seo_approved')
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'seo/_editor.html', {'project': pd, 'seo': _seo_display(seo)})
 
 
@@ -1195,6 +1234,7 @@ def _publish_template_and_ctx(project_id: str) -> tuple[str, dict]:
 
 
 def publish_step(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, extra = _publish_template_and_ctx(project_id)
     pd = extra['project']
     if request.htmx:
@@ -1206,12 +1246,7 @@ def publish_step(request, project_id):
 def publish_oauth_connect(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-
-    from studio.models import ProjectModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    project_obj = _project_obj_or_404(request, project_id)
 
     simulate = getattr(settings, 'PUBLISH_SIMULATE', True)
     if simulate:
@@ -1243,12 +1278,7 @@ def publish_oauth_connect(request, project_id):
 def publish_oauth_disconnect(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-
-    from studio.models import ProjectModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    project_obj = _project_obj_or_404(request, project_id)
 
     project_obj.oauth_refresh_token_enc = ''
     project_obj.save(update_fields=['oauth_refresh_token_enc'])
@@ -1333,12 +1363,8 @@ def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
 def publish_start(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-
-    from studio.models import ProjectModel, JobModel
-    try:
-        project_obj = ProjectModel.objects.get(id=project_id)
-    except ProjectModel.DoesNotExist:
-        raise Http404
+    from studio.models import JobModel
+    project_obj = _project_obj_or_404(request, project_id)
 
     visibility = request.POST.get('visibility', 'private')
     if visibility not in ('public', 'unlisted', 'private'):
@@ -1351,11 +1377,12 @@ def publish_start(request, project_id):
         daemon=True,
     ).start()
 
-    pd = _get_or_404(project_id)
+    pd = _get_or_404(project_id, request.user)
     return render(request, 'publish/_running.html', {'project': pd, 'job': _job_display(job)})
 
 
 def publish_status(request, project_id):
+    _project_obj_or_404(request, project_id)
     template, ctx = _publish_template_and_ctx(project_id)
     return render(request, template, ctx)
 
@@ -1364,6 +1391,7 @@ def publish_status(request, project_id):
 def upload_source(request, project_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
 
     # Validar projeto
     from studio.models import ProjectModel
@@ -1437,6 +1465,7 @@ def upload_source(request, project_id):
 def delete_source(request, project_id, source_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
 
     from studio.models import SourceModel
     try:
@@ -1460,6 +1489,7 @@ def delete_source(request, project_id, source_id):
 
 
 def source_list_partial(request, project_id):
+    _project_obj_or_404(request, project_id)
     pd = _get_or_404(project_id)
     sources = _list_sources_display(project_id)
     return render(request, 'sources/_source_list.html', {'project': pd, 'sources': sources})
@@ -1474,6 +1504,7 @@ def health_check(request):
 def api_job_list(request, project_id):
     """GET /api/projects/:id/jobs/ — últimos 20 jobs do projeto."""
     from studio.models import JobModel
+    _project_obj_or_404(request, project_id)
     jobs = JobModel.objects.filter(project_id=project_id).order_by('-created_at')[:20]
     return JsonResponse({
         'jobs': [
@@ -1494,6 +1525,7 @@ def api_job_list(request, project_id):
 def api_job_detail(request, project_id, job_id):
     """GET /api/projects/:id/jobs/:jobId — job com logs completos."""
     from studio.models import JobModel
+    _project_obj_or_404(request, project_id)
     try:
         job = JobModel.objects.get(id=job_id, project_id=project_id)
     except JobModel.DoesNotExist:

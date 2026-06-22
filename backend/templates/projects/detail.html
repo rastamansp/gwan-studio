@@ -1,110 +1,412 @@
-{% extends "base.html" %}
-{% block title %}{{ project.name }} — Gwan Studio{% endblock %}
+{% extends "internal/base.html" %}
+{% block title %}{{ project.name }} - Gwan Studio{% endblock %}
 
-{% block content %}
+{% block internal_extra_head %}
+  .workspace-breadcrumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 750;
+  }
 
-<!-- Breadcrumb -->
-<nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-5">
-  <a href="/" class="hover:text-foreground transition-colors">Projetos</a>
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
-    <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
-  </svg>
-  <span class="text-foreground font-medium truncate max-w-xs">{{ project.name }}</span>
+  .workspace-breadcrumb a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .workspace-breadcrumb a:hover {
+    color: #06111f;
+  }
+
+  .workspace-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .workspace-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .workspace-hero {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+
+  .workspace-hero-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .workspace-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #06111f 0%, #1d4ed8 72%);
+    box-shadow: 0 16px 30px rgba(29, 78, 216, 0.14);
+    flex: 0 0 auto;
+  }
+
+  .workspace-title {
+    margin: 0;
+    color: #06111f;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+
+  .workspace-meta {
+    margin: 10px 0 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .workspace-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: 12px;
+  }
+
+  .workspace-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    color: #334155;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .workspace-sidebar {
+    overflow: hidden;
+  }
+
+  .workspace-sidebar-head {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .workspace-sidebar-head h2 {
+    margin: 0;
+    color: #06111f;
+    font-size: 15px;
+    font-weight: 850;
+    letter-spacing: -0.02em;
+  }
+
+  .workspace-sidebar-head p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .workspace-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    text-align: left;
+    border: 0;
+    border-top: 1px solid #e2e8f0;
+    background: #ffffff;
+    transition: background 120ms ease;
+  }
+
+  .workspace-step:hover {
+    background: #f8fafc;
+  }
+
+  .workspace-step.is-disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .workspace-step.is-active {
+    background: #f8fafc;
+  }
+
+  .workspace-step-index {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    color: #64748b;
+    background: #eef2ff;
+    font-size: 12px;
+    font-weight: 850;
+    flex: 0 0 auto;
+  }
+
+  .workspace-step.is-active .workspace-step-index {
+    color: #ffffff;
+    background: #1d4ed8;
+  }
+
+  .workspace-step.is-done .workspace-step-index {
+    color: #047857;
+    background: #dcfce7;
+  }
+
+  .workspace-step-copy {
+    min-width: 0;
+  }
+
+  .workspace-step-copy strong {
+    display: block;
+    color: #06111f;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  .workspace-step-copy span {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .workspace-progress {
+    padding: 14px 16px 16px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+
+  .workspace-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .workspace-progress-bar {
+    height: 8px;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+  }
+
+  .workspace-progress-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #0ea5e9 0%, #1d4ed8 100%);
+  }
+
+  .workspace-stage {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .workspace-stage-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .workspace-stage-head h2 {
+    margin: 0;
+    color: #06111f;
+    font-size: 18px;
+    font-weight: 850;
+    letter-spacing: -0.03em;
+  }
+
+  .workspace-stage-head p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .workspace-stage-body {
+    padding: 18px;
+  }
+
+  @media (max-width: 980px) {
+    .workspace-summary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .workspace-shell {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .workspace-summary {
+      grid-template-columns: 1fr;
+    }
+
+    .workspace-hero {
+      display: grid;
+    }
+
+    .workspace-title {
+      font-size: 24px;
+    }
+  }
+{% endblock %}
+
+{% block internal_content %}
+<nav class="workspace-breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'dashboard' %}">Dashboard</a>
+  <span>/</span>
+  <a href="{% url 'project-list' %}">Projetos</a>
+  <span>/</span>
+  <span>{{ project.name }}</span>
 </nav>
 
-<!-- Project header -->
-<div class="flex items-start justify-between gap-4 mb-6">
-  <div class="flex items-center gap-3 min-w-0">
-    <div class="w-10 h-10 rounded-md brand-gradient flex items-center justify-center shrink-0 shadow-sm">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" class="w-4.5 h-4.5" style="width:1.125rem;height:1.125rem">
+<div class="page-head">
+  <div>
+    <p class="page-kicker">Workspace</p>
+    <h1 class="page-title">Pipeline do projeto</h1>
+    <p class="page-description">
+      Entre na etapa certa, acompanhe a producao e avance o material sem sair do ambiente interno.
+    </p>
+  </div>
+  <a href="{% url 'project-list' %}" class="app-button-secondary">Voltar para projetos</a>
+</div>
+
+<section class="panel workspace-hero">
+  <div class="workspace-hero-main">
+    <div class="workspace-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
         <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-1.383l2.44 1.953A.75.75 0 0016.75 13.5V6.5a.75.75 0 00-1.31-.497L13 7.956V6.25A2.25 2.25 0 0010.75 4h-7.5z"/>
       </svg>
     </div>
     <div class="min-w-0">
-      <h1 class="text-lg font-semibold tracking-tight truncate">{{ project.name }}</h1>
-      <p class="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3 text-red-400 shrink-0">
-          <path d="M4.918 1.636A.75.75 0 014 2.4v7.2a.75.75 0 001.164.506l4.5-3.6a.75.75 0 000-1.012l-4.5-3.6a.75.75 0 00-.246-.258z"/>
-        </svg>
-        {{ project.channel_name }}
-        {% if project.sources_count > 0 %}
-        <span class="text-muted-foreground/40">·</span>
-        <span>{{ project.sources_count }} clips · {{ project.total_duration }}</span>
-        {% endif %}
+      <h2 class="workspace-title">{{ project.name }}</h2>
+      <p class="workspace-meta">
+        {{ project.channel_name }}{% if project.sources_count > 0 %} · {{ project.sources_count }} clips · {{ project.total_duration }}{% endif %}
       </p>
+      <div class="workspace-meta-row">
+        <span class="workspace-pill">Etapa atual: {{ project.phase_label }}</span>
+        <span class="workspace-pill">Atualizado: {{ project.updated_at }}</span>
+      </div>
     </div>
   </div>
-  <span class="badge badge-{{ project.phase_color }} shrink-0">{{ project.phase_label }}</span>
+  <span class="badge badge-{{ project.phase_color }}">{{ project.phase_label }}</span>
+</section>
+
+<div class="workspace-summary">
+  <div class="panel stat-card">
+    <strong>{{ project.sources_count }}</strong>
+    <span>clips conectados ao workspace</span>
+  </div>
+  <div class="panel stat-card">
+    <strong>{{ project.total_duration }}</strong>
+    <span>duracao total conhecida</span>
+  </div>
+  <div class="panel stat-card">
+    <strong>{{ steps_done }}/{{ steps_total }}</strong>
+    <span>etapas concluidas no pipeline</span>
+  </div>
+  <div class="panel stat-card">
+    <strong>{{ project.phase_label }}</strong>
+    <span>estado operacional do projeto</span>
+  </div>
 </div>
 
-<!-- Divider -->
-<div class="separator separator-h mb-6"></div>
-
-<!-- Wizard layout -->
-<div class="flex gap-6" x-data="{ active: '{{ active_step }}' }">
-
-  <!-- Step sidebar -->
-  <aside class="w-52 shrink-0">
-    <div class="card overflow-hidden">
-      {% for step in steps %}
-      <button
-        class="step-row w-full text-left px-4 py-3 flex items-center gap-3 transition-colors
-               {% if not step.enabled %}opacity-40 cursor-not-allowed pointer-events-none{% else %}cursor-pointer{% endif %}"
-        :class="active === '{{ step.key }}' ? 'step-row-active' : ''"
-        {% if step.enabled %}
-        hx-get="{{ step.url }}"
-        hx-target="#step-content"
-        hx-swap="innerHTML"
-        @click="active = '{{ step.key }}'"
-        {% endif %}
-      >
-        <!-- Step circle -->
-        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-colors"
-             :class="active === '{{ step.key }}'
-               ? 'bg-primary text-primary-foreground'
-               : '{% if step.done %}bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400{% else %}bg-muted text-muted-foreground{% endif %}'">
-          {% if step.done %}
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
-            <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
-          </svg>
-          {% else %}
-          {{ step.index }}
-          {% endif %}
-        </div>
-
-        <!-- Label -->
-        <div class="min-w-0 leading-tight">
-          <p class="text-sm truncate"
-             :class="active === '{{ step.key }}' ? 'font-semibold text-foreground' : 'font-medium text-foreground'">
-            {{ step.label }}
-          </p>
-          {% if step.done %}
-          <p class="text-xs text-green-600 dark:text-green-400 mt-px">Concluído</p>
-          {% elif not step.enabled %}
-          <p class="text-xs text-muted-foreground/50 mt-px">Bloqueado</p>
-          {% endif %}
-        </div>
-      </button>
-      {% endfor %}
+<div class="workspace-shell" x-data="{ active: '{{ active_step }}' }">
+  <aside class="panel workspace-sidebar">
+    <div class="workspace-sidebar-head">
+      <h2>Etapas do pipeline</h2>
+      <p>Abra cada fase do fluxo e acompanhe o andamento do projeto sem perder o contexto.</p>
     </div>
 
-    <!-- Progress -->
-    <div class="mt-4 space-y-1.5">
-      <div class="flex justify-between text-xs text-muted-foreground">
-        <span>Pipeline</span>
+    {% for step in steps %}
+    <button
+      class="workspace-step {% if step.active %}is-active{% endif %} {% if step.done %}is-done{% endif %} {% if not step.enabled %}is-disabled{% endif %}"
+      {% if step.enabled %}
+      hx-get="{{ step.url }}"
+      hx-target="#step-content"
+      hx-swap="innerHTML"
+      @click="active = '{{ step.key }}'"
+      {% endif %}
+    >
+      <span class="workspace-step-index">
+        {% if step.done %}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-3 h-3">
+          <path fill-rule="evenodd" d="M10.22 1.47a.75.75 0 01.06 1.06L4.5 9.28 1.72 6.5a.75.75 0 011.06-1.06l1.72 1.72 5.36-6.59a.75.75 0 011.06-.1z" clip-rule="evenodd"/>
+        </svg>
+        {% else %}
+        {{ step.index }}
+        {% endif %}
+      </span>
+      <span class="workspace-step-copy">
+        <strong>{{ step.label }}</strong>
+        <span>
+          {% if step.done %}Concluido
+          {% elif step.active %}Etapa em foco
+          {% elif not step.enabled %}Bloqueado
+          {% else %}Disponivel{% endif %}
+        </span>
+      </span>
+    </button>
+    {% endfor %}
+
+    <div class="workspace-progress">
+      <div class="workspace-progress-meta">
+        <span>Progresso</span>
         <span>{{ steps_done }}/{{ steps_total }}</span>
       </div>
-      <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        <div class="h-full rounded-full bg-primary transition-all duration-500"
-             style="width: {% widthratio steps_done steps_total 100 %}%"></div>
+      <div class="workspace-progress-bar">
+        <span style="width: {% widthratio steps_done steps_total 100 %}%"></span>
       </div>
     </div>
   </aside>
 
-  <!-- Step content -->
-  <div id="step-content" class="flex-1 min-w-0">
-    {% include active_template %}
-  </div>
+  <section class="panel workspace-stage">
+    <div class="workspace-stage-head">
+      <div>
+        <h2>Area de trabalho</h2>
+        <p>Use o painel abaixo para operar a etapa atual e avancar o projeto dentro da esteira.</p>
+      </div>
+      <span class="badge badge-outline">{{ active_step|upper }}</span>
+    </div>
 
+    <div id="step-content" class="workspace-stage-body">
+      {% include active_template %}
+    </div>
+  </section>
 </div>
 {% endblock %}

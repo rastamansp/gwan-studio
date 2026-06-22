@@ -8,13 +8,16 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.phase0')
 django_asgi_app = get_asgi_application()
 
 from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
+from channels.auth import AuthMiddlewareStack  # noqa: E402
 from django.urls import re_path  # noqa: E402
 
 from infrastructure.ws.consumer import ProjectConsumer  # noqa: E402
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": URLRouter([
-        re_path(r"^ws/projects/(?P<project_id>[^/]+)/$", ProjectConsumer.as_asgi()),
-    ]),
+    "websocket": AuthMiddlewareStack(
+        URLRouter([
+            re_path(r"^ws/projects/(?P<project_id>[^/]+)/$", ProjectConsumer.as_asgi()),
+        ])
+    ),
 })
