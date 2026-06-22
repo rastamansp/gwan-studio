@@ -1,0 +1,27 @@
+{% load static %}
+<header class="public-header">
+  <div class="public-shell">
+    <nav class="public-nav" aria-label="Navegacao principal">
+      <a href="{% url 'home' %}" class="public-brand">
+        <img src="{% static 'brand/gwan-studio-logo-header-white.png' %}" alt="Gwan Studio" class="public-brand-logo">
+      </a>
+
+      <div class="public-links">
+        <a href="/#produto">Produto</a>
+        <a href="/#fluxo">Fluxo</a>
+        <a href="/#automacao">Automacao</a>
+      </div>
+
+      <div class="public-actions">
+        {% if request.user.is_authenticated %}
+        <a href="{% url 'dashboard' %}" class="public-cta">Abrir Studio</a>
+        {% else %}
+          {% if public_header_secondary_url and public_header_secondary_label %}
+          <a href="{{ public_header_secondary_url }}" class="public-login-link">{{ public_header_secondary_label }}</a>
+          {% endif %}
+        <a href="{{ public_header_cta_url|default:'/dashboard/' }}" class="public-cta">{{ public_header_cta_label|default:'Abrir Studio' }}</a>
+        {% endif %}
+      </div>
+    </nav>
+  </div>
+</header>

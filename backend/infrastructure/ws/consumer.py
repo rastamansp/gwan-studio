@@ -6,6 +6,7 @@ Streaming: new events are polled from the in-process store every 300 ms.
 """
 import asyncio
 
+from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 from infrastructure.ws.event_store import current_index, get_events_since
@@ -14,8 +15,15 @@ from infrastructure.ws.event_store import current_index, get_events_since
 class ProjectConsumer(AsyncJsonWebsocketConsumer):
 
     async def connect(self):
+        user = self.scope.get('user')
         self.project_id = self.scope['url_route']['kwargs']['project_id']
         self._stream_task: asyncio.Task | None = None
+        if not user or not user.is_authenticated:
+            await self.close(code=4401)
+            return
+        if not await self._user_can_access_project(user.id, self.project_id):
+            await self.close(code=4403)
+            return
         await self.accept()
         await self._send_snapshot()
         self._stream_task = asyncio.create_task(self._stream_events())
@@ -53,3 +61,8 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
                         await self.send_json(event)
         except asyncio.CancelledError:
             pass
+
+    @database_sync_to_async
+    def _user_can_access_project(self, user_id: int, project_id: str) -> bool:
+        from studio.models import ProjectModel
+        return ProjectModel.objects.filter(id=project_id, owner_id=user_id).exists()

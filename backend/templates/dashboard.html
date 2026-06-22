@@ -2,9 +2,103 @@
 {% block title %}Dashboard - Gwan Studio{% endblock %}
 
 {% block internal_extra_head %}
+  .dashboard-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .strip-item {
+    padding: 14px 16px;
+  }
+
+  .strip-item strong {
+    display: block;
+    color: #06111f;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .strip-item span {
+    display: block;
+    margin-top: 8px;
+    color: #334155;
+    font-size: 14px;
+    font-weight: 750;
+    line-height: 1.45;
+  }
+
+  .dashboard-focus {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .dashboard-focus-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
+    gap: 16px;
+    align-items: center;
+  }
+
+  .dashboard-focus h2 {
+    margin: 0;
+    color: #06111f;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .dashboard-focus p {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .focus-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .focus-metrics {
+    display: grid;
+    gap: 10px;
+  }
+
+  .focus-metric {
+    padding: 13px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+
+  .focus-metric strong {
+    display: block;
+    color: #06111f;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .focus-metric span {
+    display: block;
+    margin-top: 6px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
   .dashboard-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
     gap: 16px;
   }
 
@@ -62,10 +156,14 @@
     font-weight: 850;
   }
 
-  .recent-row p {
-    margin: 5px 0 0;
+  .recent-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
     color: #64748b;
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 700;
   }
 
   .action-list {
@@ -87,6 +185,10 @@
     text-decoration: none;
     font-size: 13px;
     font-weight: 800;
+  }
+
+  .action-item:hover {
+    background: #f8fafc;
   }
 
   .system-list {
@@ -125,7 +227,12 @@
   }
 
   @media (max-width: 980px) {
+    .dashboard-strip,
     .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-focus-grid {
       grid-template-columns: 1fr;
     }
   }
@@ -135,9 +242,9 @@
 <div class="page-head">
   <div>
     <p class="page-kicker">Dashboard</p>
-    <h1 class="page-title">Visao geral do sistema</h1>
+    <h1 class="page-title">Visao geral</h1>
     <p class="page-description">
-      Acompanhe os sinais principais do studio e entre rapidamente nos projetos em andamento.
+      Entre no projeto certo, acompanhe o estado do studio e mantenha a operacao sob controle.
     </p>
   </div>
   <button class="app-button" onclick="document.getElementById('modal-new').showModal()">
@@ -145,24 +252,54 @@
   </button>
 </div>
 
-<div class="stat-grid">
-  <div class="panel stat-card">
-    <strong>{{ projects|length }}</strong>
-    <span>projetos cadastrados</span>
+<div class="dashboard-strip">
+  <div class="panel strip-item">
+    <strong>Usuario</strong>
+    <span>{{ request.user.username }}</span>
   </div>
-  <div class="panel stat-card">
-    <strong>{% if projects %}{{ projects.0.sources_count }}{% else %}0{% endif %}</strong>
-    <span>clips no projeto mais recente</span>
+  <div class="panel strip-item">
+    <strong>Sessao</strong>
+    <span>Admin autenticado</span>
   </div>
-  <div class="panel stat-card">
-    <strong>{% if projects %}{{ projects.0.phase_label }}{% else %}-{% endif %}</strong>
-    <span>fase do projeto mais recente</span>
+  <div class="panel strip-item">
+    <strong>Projetos</strong>
+    <span>{{ projects|length }} workspace{{ projects|length|pluralize:"s" }}</span>
   </div>
-  <div class="panel stat-card">
-    <strong>{% if projects %}{{ projects.0.updated_at }}{% else %}-{% endif %}</strong>
-    <span>ultima atividade</span>
+  <div class="panel strip-item">
+    <strong>Sistema</strong>
+    <span>API e autenticacao online</span>
   </div>
 </div>
+
+<section class="panel dashboard-focus">
+  <div class="dashboard-focus-grid">
+    <div>
+      <h2>Ponto de controle do studio</h2>
+      <p>
+        Abra um novo projeto, retome um pipeline em andamento ou confira os sinais principais antes de entrar em uma etapa especifica.
+      </p>
+      <div class="focus-actions">
+        <button class="app-button" onclick="document.getElementById('modal-new').showModal()">Novo projeto</button>
+        <a href="{% url 'project-list' %}" class="app-button-secondary">Abrir listagem</a>
+      </div>
+    </div>
+
+    <div class="focus-metrics">
+      <div class="focus-metric">
+        <strong>{% if projects %}{{ projects.0.phase_label }}{% else %}-{% endif %}</strong>
+        <span>fase do projeto mais recente</span>
+      </div>
+      <div class="focus-metric">
+        <strong>{% if projects %}{{ projects.0.updated_at }}{% else %}-{% endif %}</strong>
+        <span>ultima atividade registrada</span>
+      </div>
+      <div class="focus-metric">
+        <strong>{% if projects %}{{ projects.0.sources_count }}{% else %}0{% endif %}</strong>
+        <span>clips no projeto mais recente</span>
+      </div>
+    </div>
+  </div>
+</section>
 
 <div class="dashboard-grid">
   <section class="panel">
@@ -179,7 +316,12 @@
       <a href="/projects/{{ project.id }}/" class="recent-row">
         <div>
           <h3>{{ project.name }}</h3>
-          <p>{{ project.channel_name }} · {{ project.sources_count }} clips · {{ project.updated_at }}</p>
+          <div class="recent-meta">
+            <span>{{ project.channel_name }}</span>
+            <span>{{ project.sources_count }} clips</span>
+            <span>{{ project.total_duration }}</span>
+            <span>{{ project.updated_at }}</span>
+          </div>
         </div>
         <span class="badge badge-{{ project.phase_color }}">{{ project.phase_label }}</span>
       </a>
@@ -187,7 +329,9 @@
       <div class="recent-row">
         <div>
           <h3>Nenhum projeto ainda</h3>
-          <p>Crie o primeiro workspace para iniciar o fluxo.</p>
+          <div class="recent-meta">
+            <span>Crie o primeiro workspace para iniciar o fluxo.</span>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -204,11 +348,11 @@
 
     <div class="action-list">
       <button class="action-item" onclick="document.getElementById('modal-new').showModal()">
-        Criar novo projeto
+        <span>Criar novo projeto</span>
         <span>+</span>
       </button>
       <a href="{% url 'project-list' %}" class="action-item">
-        Abrir listagem
+        <span>Abrir listagem</span>
         <span>&gt;</span>
       </a>
     </div>
@@ -219,6 +363,7 @@
         <p>Estado operacional local.</p>
       </div>
     </div>
+
     <div class="system-list">
       <div class="system-item">
         <span>Autenticacao</span>

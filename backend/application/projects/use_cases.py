@@ -23,11 +23,12 @@ class CreateProject:
     def __init__(self, repo: IProjectRepository):
         self.repo = repo
 
-    def execute(self, name: str, channel_name: str = '') -> Project:
+    def execute(self, name: str, channel_name: str = '', owner_id: int | None = None) -> Project:
         project = Project(
             id=str(uuid.uuid4()),
             name=name.strip(),
             channel_name=channel_name.strip(),
             phase='new',
+            owner_id=owner_id,
         )
         return self.repo.save(project)

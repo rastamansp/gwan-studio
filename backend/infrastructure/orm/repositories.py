@@ -3,11 +3,16 @@ from domain.ports import IProjectRepository, ISourceRepository
 
 
 class DjangoProjectRepository(IProjectRepository):
+    def __init__(self, owner=None):
+        self.owner = owner
+
     def save(self, project: Project) -> Project:
         from studio.models import ProjectModel
+        owner_id = project.owner_id or getattr(self.owner, 'id', None)
         obj, _ = ProjectModel.objects.update_or_create(
             id=project.id,
             defaults={
+                'owner_id': owner_id,
                 'name': project.name,
                 'channel_name': project.channel_name,
                 'phase': project.phase,
@@ -17,12 +22,18 @@ class DjangoProjectRepository(IProjectRepository):
 
     def get(self, project_id: str) -> Project:
         from studio.models import ProjectModel
-        obj = ProjectModel.objects.get(id=project_id)
+        queryset = ProjectModel.objects.all()
+        if self.owner is not None:
+            queryset = queryset.filter(owner=self.owner)
+        obj = queryset.get(id=project_id)
         return _to_entity(obj)
 
     def list(self) -> list[Project]:
         from studio.models import ProjectModel
-        return [_to_entity(obj) for obj in ProjectModel.objects.all()]
+        queryset = ProjectModel.objects.all()
+        if self.owner is not None:
+            queryset = queryset.filter(owner=self.owner)
+        return [_to_entity(obj) for obj in queryset]
 
 
 class DjangoSourceRepository(ISourceRepository):
@@ -76,6 +87,7 @@ def _to_entity(obj) -> Project:
         name=obj.name,
         channel_name=obj.channel_name,
         phase=obj.phase,
+        owner_id=obj.owner_id,
         created_at=obj.created_at,
         updated_at=obj.updated_at,
     )
