@@ -1,0 +1,126 @@
+{% comment %}
+F17 — Highlights detectados. Lista momentos com toggle incluir/excluir (REQ-F17-06)
+antes de seguir para o Export (que usa o merged.mp4 já cortado por este pipeline).
+{% endcomment %}
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Highlights Detectados</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">Revise os momentos antes de exportar</p>
+    </div>
+    <span class="badge badge-success">Concluído</span>
+  </div>
+
+  <!-- F18 — editor visual de timeline -->
+  <a href="/projects/{{ project.id }}/highlights/editor/" class="btn btn-outline btn-sm gap-1.5 w-full justify-center">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+      <path d="M2 4a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V4zm2-.5a.5.5 0 00-.5.5v8a.5.5 0 00.5.5h8a.5.5 0 00.5-.5V4a.5.5 0 00-.5-.5H4z"/>
+      <path d="M5 6.5A.5.5 0 015.5 6h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5zm0 3A.5.5 0 015.5 9h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5z"/>
+    </svg>
+    Editar Timeline (ajustar cortes manualmente)
+  </a>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 gap-3">
+    <div class="card p-4">
+      <p class="text-xs text-muted-foreground mb-1">Momentos detectados</p>
+      <p class="text-xl font-semibold">{{ moments|length }}</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-xs text-muted-foreground mb-1">Incluídos no highlight</p>
+      <p class="text-xl font-semibold">{{ included_count }}</p>
+    </div>
+  </div>
+
+  <!-- Lista de momentos -->
+  <div class="space-y-1.5">
+    {% for m in moments %}
+    <div class="card flex items-center gap-3 px-4 py-2.5 {% if not m.included %}opacity-40{% endif %}">
+      <span class="badge badge-secondary shrink-0 uppercase text-[10px]">{{ m.tipo }}</span>
+      <span class="text-xs font-mono text-muted-foreground shrink-0">{{ m.timestamp_fmt }}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm truncate">{{ m.descricao }}</p>
+        {% if m.source_label %}
+        <p class="text-xs text-muted-foreground/70 truncate mt-0.5">{{ m.source_label }}</p>
+        {% endif %}
+      </div>
+      <span class="text-xs font-mono text-muted-foreground shrink-0">{{ m.importancia }}/10</span>
+      <button
+        class="btn btn-ghost btn-sm shrink-0"
+        hx-post="/projects/{{ project.id }}/highlights/{{ m.id }}/toggle/"
+        hx-target="#step-content" hx-swap="innerHTML">
+        {% if m.included %}Excluir{% else %}Incluir{% endif %}
+      </button>
+    </div>
+    {% empty %}
+    <div class="card px-4 py-8 text-center text-sm text-muted-foreground">
+      Nenhum momento acima da importância mínima configurada.
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Log da detecção -->
+  {% if job_logs %}
+  <details class="group">
+    <summary class="cursor-pointer text-xs text-muted-foreground flex items-center gap-1.5 select-none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"
+           class="w-3.5 h-3.5 transition-transform group-open:rotate-90">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+      Log da detecção ({{ job_logs|length }} linhas)
+    </summary>
+    <div class="mt-2 card px-4 py-3 space-y-1 max-h-48 overflow-y-auto font-mono text-xs">
+      {% for entry in job_logs %}
+      <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'progress' %}text-blue-400{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
+        {{ entry.text }}
+      </p>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+
+  <!-- Reprocessar -->
+  {% if is_exported %}
+  {% comment %}RN-F17-04 — bloqueado após o Export.{% endcomment %}
+  <button class="btn btn-ghost btn-sm gap-1.5 opacity-40 cursor-not-allowed" disabled
+          title="Highlights já exportados — reprocessar exigiria refazer o Export">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+      <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08 1.977.75.75 0 01-1.448-.388A6 6 0 0113.058 4.58l.778.778V3.227a.75.75 0 01.75-.75z" clip-rule="evenodd"/>
+      <path fill-rule="evenodd" d="M2.164 13.523a.75.75 0 01-.75-.75V9.591a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.977l.84.841a4.5 4.5 0 007.08-1.977.75.75 0 111.448.388A6 6 0 012.943 11.42l-.778-.778v1.131a.75.75 0 01-.75.75z" clip-rule="evenodd"/>
+    </svg>
+    Reprocessar (bloqueado)
+  </button>
+  {% else %}
+  <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
+          hx-get="/projects/{{ project.id }}/highlights/?reprocess=1"
+          hx-target="#step-content" hx-swap="innerHTML">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+      <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 01.75.75v3.182a.75.75 0 01-.75.75h-3.182a.75.75 0 010-1.5h1.37l-.84-.841a4.5 4.5 0 00-7.08 1.977.75.75 0 01-1.448-.388A6 6 0 0113.058 4.58l.778.778V3.227a.75.75 0 01.75-.75z" clip-rule="evenodd"/>
+      <path fill-rule="evenodd" d="M2.164 13.523a.75.75 0 01-.75-.75V9.591a.75.75 0 01.75-.75h3.182a.75.75 0 010 1.5H3.977l.84.841a4.5 4.5 0 007.08-1.977.75.75 0 111.448.388A6 6 0 012.943 11.42l-.778-.778v1.131a.75.75 0 01-.75.75z" clip-rule="evenodd"/>
+    </svg>
+    Reprocessar
+  </button>
+  {% endif %}
+
+  <!-- Nav -->
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/sources/"
+            hx-target="#step-content" hx-swap="innerHTML">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M9.78 11.78a.75.75 0 01-1.06 0L5.47 8.53a.75.75 0 010-1.06l3.25-3.25a.75.75 0 011.06 1.06L7.06 8l2.72 2.72a.75.75 0 010 1.06z" clip-rule="evenodd"/>
+      </svg>
+      Fontes
+    </button>
+    <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/export/"
+            hx-target="#step-content" hx-swap="innerHTML">
+      Próximo: Export
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+  </div>
+</div>

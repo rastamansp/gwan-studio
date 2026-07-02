@@ -22,25 +22,28 @@ from presentation.forms import StudioUserCreationForm
 # ── display constants ──────────────────────────────────────────
 
 PHASE_LABELS = {
-    'new':              ('Novo',             'neutral'),
-    'sources_uploaded': ('Fontes Enviadas',  'info'),
-    'merge_done':       ('Merge Concluído',  'warning'),
-    'export_done':      ('Export Pronto',    'warning'),
-    'thumbnails_done':  ('Thumbnails OK',    'warning'),
-    'seo_approved':     ('SEO Aprovado',     'success'),
-    'published':        ('Publicado',        'success'),
+    'new':              ('Novo',                   'neutral'),
+    'sources_uploaded': ('Fontes Enviadas',        'info'),
+    'merge_done':       ('Merge Concluído',        'warning'),
+    'highlights_done':  ('Highlights Detectados',  'warning'),
+    'export_done':      ('Export Pronto',          'warning'),
+    'thumbnails_done':  ('Thumbnails OK',          'warning'),
+    'seo_approved':     ('SEO Aprovado',           'success'),
+    'published':        ('Publicado',              'success'),
 }
 
 PHASE_STEP_INDEX = {
     'new':              0,
     'sources_uploaded': 1,
     'merge_done':       2,
+    'highlights_done':  2,
     'export_done':      3,
     'thumbnails_done':  4,
     'seo_approved':     5,
     'published':        5,
 }
 
+# Pipeline "Go Pro" (F03): merge manual de clipes.
 STEPS_META = [
     ('sources',   'Fontes'),
     ('merge',     'Merge'),
@@ -49,6 +52,29 @@ STEPS_META = [
     ('seo',       'SEO'),
     ('publish',   'Publicar'),
 ]
+
+# Pipeline "Futebol" (F17): detecção automática de highlights substitui o merge manual.
+STEPS_META_FUTEBOL = [
+    ('sources',    'Fontes'),
+    ('highlights', 'Highlights'),
+    ('export',     'Export'),
+    ('thumbnail',  'Thumbnails'),
+    ('seo',        'SEO'),
+    ('publish',    'Publicar'),
+]
+
+
+def _steps_meta_for(project_type: str) -> list[tuple[str, str]]:
+    return STEPS_META_FUTEBOL if project_type == 'futebol' else STEPS_META
+
+
+# RN-F17-04 — fases em que o projeto já passou pelo Export; a partir daqui o
+# highlight-detect não pode mais reprocessar/substituir os HighlightMoment.
+EXPORTED_PHASES = {'export_done', 'thumbnails_done', 'seo_approved', 'published'}
+
+
+def _project_is_exported(project_obj) -> bool:
+    return project_obj.phase in EXPORTED_PHASES
 
 # Mock step content substituído progressivamente (F03+)
 _MOCK_JOB_LOGS = [
@@ -130,6 +156,10 @@ def _fmt_dt(dt) -> str:
 
 def _log_type(line: str) -> str:
     l = line.lower()
+    if l.startswith('[ok]') or 'concluído' in l or 'concluido' in l:
+        return 'success'
+    if 'non-monotonic dts' in l or 'incorrect timestamps' in l:
+        return 'warning'
     if any(k in l for k in ('error', 'invalid', 'failed', 'no such')):
         return 'error'
     if any(k in l for k in ('frame=', 'time=', 'speed=', 'bitrate=')):
@@ -202,6 +232,9 @@ def _to_display(project, sources: list[dict] | None = None) -> dict:
         'id':            project.id,
         'name':          project.name,
         'channel_name':  project.channel_name or '—',
+        'project_type':  project.project_type,
+        'is_futebol':    project.project_type == 'futebol',
+        'highlight_settings': project.highlight_settings or {},
         'phase':         project.phase,
         'phase_label':   label,
         'phase_color':   color,
@@ -213,6 +246,7 @@ def _to_display(project, sources: list[dict] | None = None) -> dict:
 
 def _build_steps(pd: dict, active_key: str) -> list[dict]:
     phase_idx = PHASE_STEP_INDEX.get(pd['phase'], 0)
+    steps_meta = _steps_meta_for(pd.get('project_type', 'gopro'))
     return [
         {
             'key':     key,
@@ -223,7 +257,7 @@ def _build_steps(pd: dict, active_key: str) -> list[dict]:
             'active':  key == active_key,
             'index':   i + 1,
         }
-        for i, (key, label) in enumerate(STEPS_META)
+        for i, (key, label) in enumerate(steps_meta)
     ]
 
 
@@ -276,26 +310,60 @@ def dashboard(request):
     return render(request, 'dashboard.html', {'projects': projects})
 
 
+VALID_PROJECT_TYPE_FILTERS = ('gopro', 'futebol')
+
+
 def project_list(request):
-    projects = [_to_display(p) for p in _user_repo(request.user).list()]
-    return render(request, 'projects/list.html', {'projects': projects})
+    type_filter = request.GET.get('type')
+    type_filter = type_filter if type_filter in VALID_PROJECT_TYPE_FILTERS else None
+    projects = [_to_display(p) for p in _user_repo(request.user).list(project_type=type_filter)]
+    return render(request, 'projects/list.html', {
+        'projects': projects,
+        'type_filter': type_filter or 'all',
+    })
 
 
 def project_new(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         channel_name = request.POST.get('channel_name', '').strip()
+        project_type = request.POST.get('project_type', 'gopro').strip()
         if not name:
             projects = [_to_display(p) for p in _user_repo(request.user).list()]
             return render(request, 'projects/list.html', {
                 'projects': projects,
                 'form_error': 'O nome do projeto é obrigatório.',
             })
+
+        highlight_settings = None
+        if project_type == 'futebol':
+            def _float_field(field, default):
+                try:
+                    return float(request.POST.get(field, default))
+                except (TypeError, ValueError):
+                    return default
+
+            def _int_field(field, default):
+                try:
+                    return int(request.POST.get(field, default))
+                except (TypeError, ValueError):
+                    return default
+
+            highlight_settings = {
+                'pre_roll':         _float_field('pre_roll', 6.0),
+                'post_roll':        _float_field('post_roll', 8.0),
+                'merge_gap':        _float_field('merge_gap', 4.0),
+                'top_n_peaks':      _int_field('top_n_peaks', 40),
+                'importancia_min':  _int_field('importancia_min', 5),
+            }
+
         from application.projects.use_cases import CreateProject
         project = CreateProject(_user_repo(request.user)).execute(
             name,
             channel_name,
             owner_id=request.user.id,
+            project_type=project_type,
+            highlight_settings=highlight_settings,
         )
         return redirect(f'/projects/{project.id}/')
     return redirect('/projects/')
@@ -516,6 +584,515 @@ def merge_status(request, project_id):
     return render(request, template, ctx)
 
 
+# ── F17: pipeline "Futebol" — detecção automática de highlights ────────
+
+def _latest_highlight_job(project_id):
+    from studio.models import JobModel
+    return (
+        JobModel.objects
+        .filter(project_id=project_id, job_type='highlight_detect')
+        .order_by('-created_at')
+        .first()
+    )
+
+
+def _list_highlight_moments(project_id: str) -> list[dict]:
+    """Inclui `source_label` (nome do vídeo de origem) quando o projeto tem
+    mais de um source — útil para distinguir 1º/2º tempo, múltiplas câmeras etc."""
+    from studio.models import HighlightMomentModel, SourceModel
+
+    sources = list(SourceModel.objects.filter(project_id=project_id).order_by('sort_order', 'created_at'))
+    show_source_label = len(sources) > 1
+    filenames_by_id = {str(s.id): s.original_filename for s in sources}
+    order_by_id = {str(s.id): i + 1 for i, s in enumerate(sources)}
+
+    def _label(source_id: str | None) -> str | None:
+        if not show_source_label or not source_id or source_id not in filenames_by_id:
+            return None
+        return f"{order_by_id[source_id]}º tempo — {filenames_by_id[source_id]}"
+
+    return [
+        {
+            'id':            str(m.id),
+            'source_id':     str(m.source_id) if m.source_id else None,
+            'source_label':  _label(str(m.source_id) if m.source_id else None),
+            'timestamp_sec': m.timestamp_sec,
+            'timestamp_fmt': _fmt_duration(int(m.timestamp_sec)),
+            'tipo':          m.tipo,
+            'descricao':     m.descricao,
+            'importancia':   m.importancia,
+            'included':      m.included,
+        }
+        for m in HighlightMomentModel.objects.filter(project_id=project_id)
+    ]
+
+
+def _highlight_template_and_ctx(project_id: str, force_editor: bool = False) -> tuple[str, dict]:
+    pd = _get_or_404(project_id)
+    job = _latest_highlight_job(project_id)
+    moments = _list_highlight_moments(project_id)
+
+    if job and job.status == 'running':
+        return 'highlights/_running.html', {'project': pd, 'job': _job_display(job)}
+
+    is_exported = pd['phase'] in EXPORTED_PHASES
+
+    if not force_editor and job and job.status == 'done' and moments:
+        included_count = sum(1 for m in moments if m['included'])
+        return 'highlights/_result.html', {
+            'project': pd,
+            'moments': moments,
+            'included_count': included_count,
+            'job': _job_display(job),
+            'job_logs': job.logs or [],
+            'is_exported': is_exported,
+        }
+
+    return 'highlights/_editor.html', {
+        'project': pd,
+        'settings': pd.get('highlight_settings') or {},
+        'job_error': job.error if job and job.status == 'failed' else None,
+        'is_exported': is_exported,
+    }
+
+
+def highlights_step(request, project_id):
+    _project_obj_or_404(request, project_id)
+    force_editor = request.GET.get('reprocess') == '1'
+    template, extra = _highlight_template_and_ctx(project_id, force_editor=force_editor)
+    pd = extra['project']
+    if request.htmx:
+        return render(request, template, extra)
+    ctx = _step_ctx(pd, 'highlights', {**extra, 'active_template': template})
+    return render(request, 'projects/detail.html', ctx)
+
+
+def _persist_highlight_clips(project_id: str, clip_records: list) -> None:
+    """F18 — grava o plano de corte (EDL) a partir de `(source, start, end)`.
+
+    Substitui por completo os `HighlightClipModel` anteriores (RN-F18-04):
+    reprocessar a detecção sempre reseta ajustes manuais feitos no editor.
+    """
+    from studio.models import HighlightClipModel
+    HighlightClipModel.objects.filter(project_id=project_id).delete()
+    HighlightClipModel.objects.bulk_create([
+        HighlightClipModel(
+            project_id=project_id, source=src, start_sec=start, end_sec=end,
+            order=i, included=True,
+        )
+        for i, (src, start, end) in enumerate(clip_records)
+    ])
+
+
+def _cut_highlight_from_clips(project_id: str, simulate: bool) -> tuple[dict, list[str]]:
+    """F18 — (re)gera `merged.mp4` a partir dos `HighlightClipModel.included=True`
+    atuais, sem tocar em áudio/Whisper/Claude — só FFmpeg (cut_and_concat)."""
+    from studio.models import HighlightClipModel
+
+    storage = get_storage()
+    clips = list(
+        HighlightClipModel.objects.filter(project_id=project_id, included=True)
+        .select_related('source').order_by('order')
+    )
+    if not clips:
+        raise RuntimeError('Nenhum corte incluído — não é possível gerar o highlight.')
+
+    all_clips = [
+        (storage.resolve_read_path(clip.source.storage_key), clip.start_sec, clip.end_sec)
+        for clip in clips
+    ]
+
+    output_key = f'studio/{project_id}/merged/merged.mp4'
+    output_path = storage.resolve_write_path(output_key)
+    if simulate:
+        from infrastructure.ffmpeg.highlights import simulate_cut_and_concat
+        cut_logs = simulate_cut_and_concat(all_clips, output_path)
+    else:
+        from infrastructure.ffmpeg.highlights import cut_and_concat
+        cut_logs = cut_and_concat(all_clips, output_path)
+    storage.finalize_write(output_key, output_path, 'video/mp4')
+
+    size_bytes = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+    result = {'output_key': output_key, 'size_bytes': size_bytes, 'num_clips': len(all_clips)}
+    return result, cut_logs
+
+
+def _run_highlight_job(job_id: str, project_id: str, project_name: str,
+                        source_keys: list[str], highlight_settings: dict) -> None:
+    """RF03-RF07 — extrai áudio, detecta picos, analisa com Claude e corta o
+    highlight final. Isola falhas por source (RN-F17 / REQ-F17-08): um source
+    com erro não interrompe o processamento dos demais."""
+    from studio.models import JobModel, ProjectModel, SourceModel, HighlightMomentModel
+    from domain.highlight_rules import merge_moments
+
+    storage = get_storage()
+    logs: list[dict] = []
+
+    def _log(text: str, log_type: str = 'info') -> None:
+        logs.append({'text': text, 'type': log_type})
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'highlight_detect', 'status': 'running', 'log_line': text,
+        }})
+
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'highlight_detect', 'status': 'running',
+        }})
+
+        simulate = getattr(settings, 'HIGHLIGHT_SIMULATE', True)
+        use_queue = not simulate and getattr(settings, 'HIGHLIGHT_USE_QUEUE', False)
+        api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+        pre_roll = highlight_settings.get('pre_roll', 6.0)
+        post_roll = highlight_settings.get('post_roll', 8.0)
+        merge_gap = highlight_settings.get('merge_gap', 4.0)
+        top_n_peaks = highlight_settings.get('top_n_peaks', 40)
+        importancia_min = highlight_settings.get('importancia_min', 5)
+
+        HighlightMomentModel.objects.filter(project_id=project_id).delete()
+
+        clip_records: list[tuple] = []  # (source, start, end) — vira HighlightClipModel (F18)
+        any_success = False
+
+        for source_key in source_keys:
+            source = None
+            try:
+                source = SourceModel.objects.get(storage_key=source_key, project_id=project_id)
+                video_path = storage.resolve_read_path(source_key)
+                wav_key = f'studio/{project_id}/tmp/{source.id}.wav'
+
+                if simulate:
+                    _log(f'[SIMULADO] Extraindo áudio e detectando picos: {source.original_filename}')
+                    from infrastructure.ffmpeg.highlights import simulate_energy_peaks
+                    peaks = simulate_energy_peaks(source.duration_sec or 300, top_n_peaks)
+                else:
+                    _log(f'Extraindo áudio: {source.original_filename}')
+                    wav_path = storage.resolve_write_path(wav_key)
+                    from infrastructure.ffmpeg.highlights import extract_audio_wav, audio_energy_peaks
+                    extract_audio_wav(video_path, wav_path)
+                    if use_queue:
+                        # Necessário para o highlight-worker (container externo) conseguir
+                        # ler o WAV via MinIO — no-op no LocalStorageAdapter.
+                        storage.finalize_write(wav_key, wav_path, 'audio/wav')
+                    _log(f'Detectando picos de energia: {source.original_filename}')
+                    peaks = audio_energy_peaks(wav_path, top_n_peaks)
+
+                _log(f'{len(peaks)} pico(s) candidato(s) — {source.original_filename}', 'success')
+
+                if simulate:
+                    from infrastructure.ai.highlight_analyzer import simulate_detect_moments
+                    _log(f'[SIMULADO] Analisando picos: {source.original_filename}')
+                    raw_moments = simulate_detect_moments(peaks, importancia_min)
+                elif use_queue:
+                    from infrastructure.messaging.rabbitmq_highlight_client import RabbitMqHighlightWorkerClient
+                    _log(f'Aguardando worker (transcrição Whisper + Claude): {source.original_filename}')
+                    worker_client = RabbitMqHighlightWorkerClient(
+                        url=getattr(settings, 'RABBITMQ_URL', ''),
+                        queue=getattr(settings, 'RABBITMQ_HIGHLIGHT_QUEUE', 'highlight.detect'),
+                        exchange=getattr(settings, 'RABBITMQ_HIGHLIGHT_EXCHANGE', 'highlight'),
+                        routing_key=getattr(settings, 'RABBITMQ_HIGHLIGHT_ROUTING_KEY', 'highlight.results'),
+                        timeout_sec=getattr(settings, 'HIGHLIGHT_WORKER_TIMEOUT_SEC', 900),
+                    )
+                    raw_moments = worker_client.detect_moments(
+                        project_id=project_id,
+                        source_id=str(source.id),
+                        audio_wav_key=wav_key,
+                        energy_peaks=peaks,
+                        importancia_min=importancia_min,
+                    )
+                    _log(f'Resposta do worker recebida: {source.original_filename}', 'success')
+                else:
+                    from infrastructure.ai.highlight_analyzer import ClaudeHighlightAnalyzer
+                    _log(f'Analisando com Claude (sem Whisper — adapter provisório): {source.original_filename}')
+                    analyzer = ClaudeHighlightAnalyzer(api_key=api_key)
+                    raw_moments = analyzer.detect_moments(
+                        peaks, source.duration_sec or 0, project_name, importancia_min,
+                    )
+
+                for m in raw_moments:
+                    HighlightMomentModel.objects.create(
+                        project_id=project_id,
+                        source=source,
+                        timestamp_sec=m['timestamp'],
+                        tipo=m.get('tipo', 'outro'),
+                        descricao=m.get('descricao', ''),
+                        importancia=m.get('importancia', 0),
+                        included=True,
+                    )
+
+                intervals = merge_moments(
+                    raw_moments, source.duration_sec or 0, pre_roll, post_roll, merge_gap,
+                )
+                clip_records.extend((source, i.start, i.end) for i in intervals)
+                _log(f'{len(intervals)} intervalo(s) de corte — {source.original_filename}', 'success')
+                any_success = True
+
+            except Exception as source_exc:
+                # RN de isolamento (REQ-F17-08): falha em um source não derruba o job inteiro.
+                label = source.original_filename if source else source_key
+                _log(f'[ERRO] {label}: {source_exc}', 'error')
+
+        if not any_success or not clip_records:
+            raise RuntimeError('Nenhum highlight detectado em nenhuma fonte (ajuste importancia_min ou revise o áudio).')
+
+        # F18 — persiste o plano de corte (EDL) editável no editor de timeline.
+        _persist_highlight_clips(project_id, clip_records)
+        cut_result, cut_logs = _cut_highlight_from_clips(project_id, simulate=simulate)
+        for line in cut_logs:
+            _log(line, _log_type(line))
+
+        moments_count = HighlightMomentModel.objects.filter(project_id=project_id, included=True).count()
+
+        job.status = 'done'
+        job.logs = logs
+        job.result = cut_result
+        job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
+        ProjectModel.objects.filter(id=project_id).update(phase='highlights_done')
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'highlight_detect', 'status': 'done',
+            'output_params': {'size_bytes': cut_result['size_bytes'], 'moments': moments_count},
+        }})
+
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error = str(exc)
+            job.logs = logs
+            job.save(update_fields=['status', 'error', 'logs', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'highlight_detect', 'status': 'failed', 'error': str(exc),
+            }})
+        except Exception:
+            pass
+
+
+class HighlightDetectError(Exception):
+    """Erro de validação ao iniciar o job de highlight-detect (não é falha do job em si)."""
+    def __init__(self, message: str, status: int, code: str = 'invalid'):
+        super().__init__(message)
+        self.message = message
+        self.status = status
+        self.code = code  # 'wrong_type' | 'locked' | 'no_sources'
+
+
+def _launch_highlight_job(project_obj):
+    """REQ-F17-02/RN-F17-04/RN-F17-05 — valida e dispara o job de detecção em background.
+
+    Compartilhado entre a view HTMX (highlights_start) e a API REST
+    (api_highlight_detect), para não duplicar a regra de negócio.
+    Levanta HighlightDetectError em caso de validação inválida.
+    """
+    from studio.models import SourceModel, JobModel
+
+    if project_obj.project_type != 'futebol':
+        raise HighlightDetectError('job only available for project_type=futebol', 409, code='wrong_type')
+
+    if _project_is_exported(project_obj):
+        raise HighlightDetectError(
+            'Highlights já foram exportados — reprocessar exigiria refazer o Export. '
+            'Volte à etapa Export para gerar o vídeo novamente após revisar os highlights.',
+            409, code='locked',
+        )
+
+    sources = list(SourceModel.objects.filter(project=project_obj, status='ready'))
+    if not sources:
+        raise HighlightDetectError(
+            'Adicione pelo menos uma fonte antes de detectar highlights.', 400, code='no_sources',
+        )
+
+    source_keys = [s.storage_key for s in sources]
+    project_id = str(project_obj.id)
+
+    job = JobModel.objects.create(
+        project=project_obj,
+        job_type='highlight_detect',
+        status='pending',
+        source_order=[str(s.id) for s in sources],
+    )
+
+    t = threading.Thread(
+        target=_run_highlight_job,
+        args=(
+            str(job.id), project_id, project_obj.name,
+            source_keys, project_obj.highlight_settings or {},
+        ),
+        daemon=True,
+    )
+    t.start()
+    return job
+
+
+def highlights_start(request, project_id):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    project_obj = _project_obj_or_404(request, project_id)
+
+    try:
+        job = _launch_highlight_job(project_obj)
+    except HighlightDetectError as exc:
+        if exc.code == 'wrong_type':
+            # Defensivo — não deveria ser alcançável pela UI (só existe rota p/ futebol).
+            return JsonResponse({'error': exc.message}, status=exc.status)
+        template, ctx = 'highlights/_editor.html', {
+            'project': _get_or_404(project_id, request.user),
+            'settings': project_obj.highlight_settings or {},
+            'job_error': exc.message,
+        }
+        return render(request, template, ctx)
+
+    pd = _get_or_404(project_id, request.user)
+    return render(request, 'highlights/_running.html', {
+        'project': pd,
+        'job': _job_display(job),
+    })
+
+
+def highlights_status(request, project_id):
+    """Polling HTMX — retorna o template adequado ao estado atual do job."""
+    _project_obj_or_404(request, project_id)
+    template, ctx = _highlight_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+def highlight_toggle(request, project_id, moment_id):
+    """REQ-F17-06 — inclui/exclui manualmente um momento antes do export."""
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
+
+    from studio.models import HighlightMomentModel
+    try:
+        moment = HighlightMomentModel.objects.get(id=moment_id, project_id=project_id)
+    except HighlightMomentModel.DoesNotExist:
+        raise Http404
+
+    moment.included = not moment.included
+    moment.save(update_fields=['included'])
+
+    template, ctx = _highlight_template_and_ctx(project_id)
+    return render(request, template, ctx)
+
+
+# ── F18: editor de timeline de cortes ───────────────────────────
+
+def highlights_editor(request, project_id):
+    """F18 — tela dedicada (fora do wizard de steps) para ajustar manualmente
+    os limites de cada corte, arrastando sobre a timeline do vídeo original."""
+    project_obj = _project_obj_or_404(request, project_id)
+    pd = _get_or_404(project_id, request.user)
+    if not pd['is_futebol']:
+        raise Http404
+
+    from studio.models import HighlightClipModel, SourceModel
+
+    sources = list(
+        SourceModel.objects.filter(project=project_obj, status='ready').order_by('sort_order', 'created_at')
+    )
+    sources_data = []
+    for source in sources:
+        clips = HighlightClipModel.objects.filter(project_id=project_id, source=source).order_by('order')
+        sources_data.append({
+            'source': {
+                'id': str(source.id),
+                'filename': source.original_filename,
+                'duration_sec': source.duration_sec or 0,
+            },
+            'clips': [
+                {
+                    'id': str(c.id), 'start_sec': c.start_sec, 'end_sec': c.end_sec,
+                    'included': c.included, 'order': c.order,
+                }
+                for c in clips
+            ],
+        })
+
+    return render(request, 'highlights/editor.html', {
+        'project': pd,
+        'sources_data_json': json.dumps(sources_data, ensure_ascii=False),
+        'is_exported': pd['phase'] in EXPORTED_PHASES,
+    })
+
+
+def highlights_editor_save(request, project_id):
+    """F18 — REQ-F18-06: valida (RN-F18-01/02/03), persiste os cortes editados
+    e dispara o recorte (FFmpeg), sem repetir Whisper/Claude."""
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    _project_obj_or_404(request, project_id)
+
+    from studio.models import HighlightClipModel
+
+    try:
+        payload = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'invalid JSON body'}, status=400)
+
+    edits = payload.get('clips', [])
+    if not isinstance(edits, list):
+        return JsonResponse({'error': 'clips deve ser uma lista'}, status=400)
+
+    clips_by_id = {
+        str(c.id): c
+        for c in HighlightClipModel.objects.filter(project_id=project_id).select_related('source')
+    }
+
+    updates = []
+    by_source: dict[str, list] = {}
+    for edit in edits:
+        clip = clips_by_id.get(str(edit.get('id')))
+        if clip is None:
+            return JsonResponse({'error': f"clip {edit.get('id')} não encontrado"}, status=404)
+
+        try:
+            start = float(edit.get('start_sec', clip.start_sec))
+            end = float(edit.get('end_sec', clip.end_sec))
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'start_sec/end_sec inválidos'}, status=400)
+        included = bool(edit.get('included', clip.included))
+        duration = clip.source.duration_sec or 0
+
+        # RN-F18-01/02
+        if start < 0 or (duration and end > duration):
+            return JsonResponse(
+                {'error': f'corte fora dos limites do vídeo ({clip.source.original_filename})'}, status=400,
+            )
+        if end - start < 0.5:
+            return JsonResponse({'error': 'corte precisa ter ao menos 0.5s de duração'}, status=400)
+
+        updates.append((clip, start, end, included))
+        by_source.setdefault(str(clip.source_id), []).append((start, end, included))
+
+    # RN-F18-03 — sem sobreposição entre clipes incluídos do mesmo source.
+    for items in by_source.values():
+        included_items = sorted((i for i in items if i[2]), key=lambda i: i[0])
+        for prev, curr in zip(included_items, included_items[1:]):
+            if curr[0] < prev[1]:
+                return JsonResponse({'error': 'cortes sobrepostos não são permitidos'}, status=400)
+
+    for clip, start, end, included in updates:
+        clip.start_sec = start
+        clip.end_sec = end
+        clip.included = included
+        clip.save(update_fields=['start_sec', 'end_sec', 'included'])
+
+    simulate = getattr(settings, 'HIGHLIGHT_SIMULATE', True)
+    try:
+        result, _logs = _cut_highlight_from_clips(project_id, simulate=simulate)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+
+    project_obj = _project_obj_or_404(request, project_id)
+    return JsonResponse({
+        'ok': True,
+        'result': result,
+        'is_exported': _project_is_exported(project_obj),
+    })
+
+
 def _latest_export_job(project_id):
     from studio.models import JobModel
     return (
@@ -688,6 +1265,23 @@ def export_download(request, project_id):
             content_type='video/mp4',
         )
     return HttpResponseRedirect(storage.get_presigned_url(final_key, expires=86400))
+
+
+def export_preview(request, project_id):
+    """Stream inline (sem Content-Disposition: attachment) para o `<video>`
+    da tela de Export/Publicar — REQ-F07 (pré-visualização antes de publicar)."""
+    _project_obj_or_404(request, project_id)
+    from django.http import FileResponse, Http404, HttpResponseRedirect
+    storage = get_storage()
+    final_key = f'studio/{project_id}/final/final.mp4'
+    if not storage.object_exists(final_key):
+        raise Http404
+    if storage.is_local:
+        return FileResponse(
+            open(storage.resolve_read_path(final_key), 'rb'),
+            content_type='video/mp4',
+        )
+    return HttpResponseRedirect(storage.get_presigned_url(final_key, expires=3600))
 
 
 def _latest_thumbnail_job(project_id):
@@ -1202,9 +1796,14 @@ def _publish_checklist(project_id: str) -> tuple[list[dict], bool]:
     return items, all(i['ok'] for i in items)
 
 
+def _final_video_available(project_id: str) -> bool:
+    return get_storage().object_exists(f'studio/{project_id}/final/final.mp4')
+
+
 def _publish_template_and_ctx(project_id: str) -> tuple[str, dict]:
     pd = _get_or_404(project_id)
     job = _latest_publish_job(project_id)
+    video_available = _final_video_available(project_id)
 
     if job and job.status == 'running':
         return 'publish/_running.html', {'project': pd, 'job': _job_display(job)}
@@ -1212,9 +1811,10 @@ def _publish_template_and_ctx(project_id: str) -> tuple[str, dict]:
     record = _get_publish_record(project_id)
     if record:
         return 'publish/_result.html', {
-            'project':        pd,
-            'record':         record,
-            'pipeline_steps': ['Fontes', 'Merge', 'Export', 'Thumbnails', 'SEO', 'Publicado'],
+            'project':         pd,
+            'record':          record,
+            'pipeline_steps':  ['Fontes', 'Merge', 'Export', 'Thumbnails', 'SEO', 'Publicado'],
+            'video_available': video_available,
         }
 
     checklist, all_ok = _publish_checklist(project_id)
@@ -1225,11 +1825,12 @@ def _publish_template_and_ctx(project_id: str) -> tuple[str, dict]:
     except _PM.DoesNotExist:
         oauth_connected = False
     return 'publish/_oauth.html', {
-        'project':        pd,
-        'checklist':      checklist,
-        'all_ok':         all_ok,
+        'project':         pd,
+        'checklist':       checklist,
+        'all_ok':          all_ok,
         'oauth_connected': oauth_connected,
-        'job_error':      job.error if job and job.status == 'failed' else None,
+        'job_error':       job.error if job and job.status == 'failed' else None,
+        'video_available': video_available,
     }
 
 
@@ -1253,26 +1854,73 @@ def publish_oauth_connect(request, project_id):
         project_obj.oauth_refresh_token_enc = 'SIMULATED_TOKEN_PHASE0'
         project_obj.save(update_fields=['oauth_refresh_token_enc'])
     else:
-        # Real: build Google OAuth redirect URL and redirect
-        from google_auth_oauthlib.flow import Flow
-        flow = Flow.from_client_config(
-            {'web': {
-                'client_id':     settings.GOOGLE_CLIENT_ID,
-                'client_secret': settings.GOOGLE_CLIENT_SECRET,
-                'auth_uri':      'https://accounts.google.com/o/oauth2/auth',
-                'token_uri':     'https://oauth2.googleapis.com/token',
-                'redirect_uris': [request.build_absolute_uri(f'/projects/{project_id}/publish/oauth/callback/')],
-            }},
-            scopes=['https://www.googleapis.com/auth/youtube.upload'],
-        )
-        flow.redirect_uri = request.build_absolute_uri(f'/projects/{project_id}/publish/oauth/callback/')
-        auth_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
-        request.session[f'oauth_state_{project_id}'] = state
-        from django.http import HttpResponseRedirect
-        return HttpResponseRedirect(auth_url)
+        pre_token = getattr(settings, 'YOUTUBE_REFRESH_TOKEN', '')
+        if pre_token:
+            # Dev mode: token pré-configurado no .env.local — sem redirect OAuth
+            from infrastructure.youtube.oauth import encode_token
+            project_obj.oauth_refresh_token_enc = encode_token(pre_token)
+            project_obj.save(update_fields=['oauth_refresh_token_enc'])
+        else:
+            # Web OAuth flow (credential tipo "web" no Google Cloud Console)
+            from django.http import HttpResponseRedirect
+            from google_auth_oauthlib.flow import Flow
+            flow = Flow.from_client_config(
+                {'web': {
+                    'client_id':     settings.GOOGLE_CLIENT_ID,
+                    'client_secret': settings.GOOGLE_CLIENT_SECRET,
+                    'auth_uri':      'https://accounts.google.com/o/oauth2/auth',
+                    'token_uri':     'https://oauth2.googleapis.com/token',
+                    'redirect_uris': [request.build_absolute_uri(
+                        f'/projects/{project_id}/publish/oauth/callback/'
+                    )],
+                }},
+                scopes=['https://www.googleapis.com/auth/youtube.upload'],
+            )
+            flow.redirect_uri = request.build_absolute_uri(
+                f'/projects/{project_id}/publish/oauth/callback/'
+            )
+            auth_url, state = flow.authorization_url(
+                access_type='offline', include_granted_scopes='true', prompt='consent'
+            )
+            request.session[f'oauth_state_{project_id}'] = state
+            return HttpResponseRedirect(auth_url)
 
     template, ctx = _publish_template_and_ctx(project_id)
     return render(request, template, ctx)
+
+
+def publish_oauth_callback(request, project_id):
+    """Callback do Google OAuth — troca code por refresh_token."""
+    _project_obj_or_404(request, project_id)
+    from django.http import HttpResponseRedirect
+    from google_auth_oauthlib.flow import Flow
+    from infrastructure.youtube.oauth import encode_token
+
+    state = request.session.get(f'oauth_state_{project_id}', '')
+    flow = Flow.from_client_config(
+        {'web': {
+            'client_id':     settings.GOOGLE_CLIENT_ID,
+            'client_secret': settings.GOOGLE_CLIENT_SECRET,
+            'auth_uri':      'https://accounts.google.com/o/oauth2/auth',
+            'token_uri':     'https://oauth2.googleapis.com/token',
+            'redirect_uris': [request.build_absolute_uri(
+                f'/projects/{project_id}/publish/oauth/callback/'
+            )],
+        }},
+        scopes=['https://www.googleapis.com/auth/youtube.upload'],
+        state=state,
+    )
+    flow.redirect_uri = request.build_absolute_uri(
+        f'/projects/{project_id}/publish/oauth/callback/'
+    )
+    flow.fetch_token(authorization_response=request.build_absolute_uri(request.get_full_path()))
+
+    from studio.models import ProjectModel
+    ProjectModel.objects.filter(id=project_id).update(
+        oauth_refresh_token_enc=encode_token(flow.credentials.refresh_token)
+    )
+    del request.session[f'oauth_state_{project_id}']
+    return HttpResponseRedirect(f'/projects/{project_id}/publish/')
 
 
 def publish_oauth_disconnect(request, project_id):
@@ -1315,16 +1963,22 @@ def _run_publish_job(job_id: str, project_id: str, visibility: str) -> None:
             logs.append({'text': '[SIMULADO] Upload para YouTube simulado', 'type': 'info'})
             logs.append({'text': f'video_id fictício: {video_id}', 'type': 'success'})
         else:
+            from studio.models import SeoMetadataModel
             project_obj = ProjectModel.objects.get(id=project_id)
             final_key   = f'studio/{project_id}/final/final.mp4'
             final_path  = get_storage().resolve_read_path(final_key)
+            # Usa SEO aprovado se disponível
+            seo = SeoMetadataModel.objects.filter(project_id=project_id).first()
+            title       = (seo.title       if seo and seo.title       else project_obj.name)
+            description = (seo.description if seo and seo.description else '')
+            tags        = (seo.tags        if seo and seo.tags        else [])
             from infrastructure.youtube.uploader import upload_video
             video_id = upload_video(
                 refresh_token_enc=project_obj.oauth_refresh_token_enc,
                 video_path=final_path,
-                title='',
-                description='',
-                tags=[],
+                title=title,
+                description=description,
+                tags=tags,
                 visibility=visibility,
                 log_fn=lambda msg: logs.append({'text': msg, 'type': 'info'}),
             )
@@ -1462,6 +2116,25 @@ def upload_source(request, project_id):
     })
 
 
+def source_preview(request, project_id, source_id):
+    """F18 — stream inline do vídeo de origem (não o highlight cortado), para
+    o player do editor de timeline."""
+    _project_obj_or_404(request, project_id)
+    from django.http import FileResponse, HttpResponseRedirect
+    from studio.models import SourceModel
+    try:
+        source = SourceModel.objects.get(id=source_id, project_id=project_id)
+    except SourceModel.DoesNotExist:
+        raise Http404
+    storage = get_storage()
+    if storage.is_local:
+        return FileResponse(
+            open(storage.resolve_read_path(source.storage_key), 'rb'),
+            content_type='video/mp4',
+        )
+    return HttpResponseRedirect(storage.get_presigned_url(source.storage_key, expires=3600))
+
+
 def delete_source(request, project_id, source_id):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
@@ -1539,4 +2212,60 @@ def api_job_detail(request, project_id, job_id):
         'result':     job.result or {},
         'created_at': job.created_at.isoformat() if job.created_at else None,
         'updated_at': job.updated_at.isoformat() if job.updated_at else None,
+    })
+
+
+# ── F17: REST API — highlights ──────────────────────────────────
+
+def api_highlight_detect(request, project_id):
+    """POST /api/projects/:id/jobs/highlight-detect — ver api-contracts.md."""
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    project_obj = _project_obj_or_404(request, project_id)
+
+    try:
+        job = _launch_highlight_job(project_obj)
+    except HighlightDetectError as exc:
+        return JsonResponse({'detail': exc.message}, status=exc.status)
+
+    return JsonResponse({'job_id': str(job.id), 'status': job.status}, status=202)
+
+
+def api_highlight_list(request, project_id):
+    """GET /api/projects/:id/highlights — ver api-contracts.md."""
+    if request.method != 'GET':
+        return HttpResponseNotAllowed(['GET'])
+    _project_obj_or_404(request, project_id)
+    return JsonResponse(_list_highlight_moments(project_id), safe=False)
+
+
+def api_highlight_update(request, project_id, highlight_id):
+    """PATCH /api/projects/:id/highlights/:highlightId — ver api-contracts.md."""
+    if request.method != 'PATCH':
+        return HttpResponseNotAllowed(['PATCH'])
+    _project_obj_or_404(request, project_id)
+
+    from studio.models import HighlightMomentModel
+    try:
+        moment = HighlightMomentModel.objects.get(id=highlight_id, project_id=project_id)
+    except HighlightMomentModel.DoesNotExist:
+        raise Http404
+
+    try:
+        payload = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'detail': 'invalid JSON body'}, status=400)
+
+    if 'included' in payload:
+        moment.included = bool(payload['included'])
+        moment.save(update_fields=['included'])
+
+    return JsonResponse({
+        'id':            str(moment.id),
+        'source_id':     str(moment.source_id) if moment.source_id else None,
+        'timestamp_sec': moment.timestamp_sec,
+        'tipo':          moment.tipo,
+        'descricao':     moment.descricao,
+        'importancia':   moment.importancia,
+        'included':      moment.included,
     })

@@ -1,8 +1,24 @@
 """MinioStorageAdapter — artefatos no MinIO via boto3 (S3-compatible)."""
+import hashlib
 import os
 from pathlib import Path
 
 from domain.ports import IObjectStoragePort
+
+
+def _cache_filename(key: str) -> str:
+    """Nome de arquivo local curto e determinístico para uma S3 key.
+
+    Necessário no Windows: uma key como `studio/<uuid>/sources/<uuid>-<nome
+    original longo>.mp4` combinada com o `media_root` do projeto facilmente
+    estoura o limite de 260 caracteres do MAX_PATH clássico, e o download via
+    boto3/s3transfer falha com `FileNotFoundError` ao abrir o arquivo
+    temporário. O cache é só uso interno (nunca exposto), então achatar em
+    hash + extensão remove o problema sem afetar a key real no bucket.
+    """
+    ext = Path(key).suffix
+    digest = hashlib.sha256(key.encode('utf-8')).hexdigest()
+    return f'{digest}{ext}'
 
 
 class MinioStorageAdapter(IObjectStoragePort):
@@ -44,15 +60,13 @@ class MinioStorageAdapter(IObjectStoragePort):
         )
 
     def resolve_read_path(self, key: str) -> str:
-        target = self._cache / key
+        target = self._cache / _cache_filename(key)
         if not target.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
             self._s3.download_file(self._bucket, key, str(target))
         return str(target)
 
     def resolve_write_path(self, key: str) -> str:
-        path = self._temp / key
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path = self._temp / _cache_filename(key)
         return str(path)
 
     def finalize_write(self, key: str, local_path: str, content_type: str) -> None:

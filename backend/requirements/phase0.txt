@@ -7,3 +7,6 @@ Pillow==10.*
 anthropic==0.*
 # F09 — WebSocket
 channels[daphne]==4.*
+# F07 — YouTube OAuth + upload
+google-api-python-client==2.*
+google-auth-oauthlib==1.*

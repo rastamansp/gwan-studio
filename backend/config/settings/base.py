@@ -88,11 +88,20 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # MinIO
+STORAGE_BACKEND = config('STORAGE_BACKEND', default='minio')
 MINIO_ENDPOINT = config('MINIO_ENDPOINT', default='localhost:9000')
 MINIO_ACCESS_KEY = config('MINIO_ACCESS_KEY', default='minioadmin')
 MINIO_SECRET_KEY = config('MINIO_SECRET_KEY', default='minioadmin')
 MINIO_BUCKET = config('MINIO_BUCKET', default='studio')
 MINIO_USE_SSL = config('MINIO_USE_SSL', default=False, cast=bool)
+
+# F17 — ponte RabbitMQ com o highlight-worker externo (Whisper + Claude reais).
+HIGHLIGHT_USE_QUEUE = config('HIGHLIGHT_USE_QUEUE', default=False, cast=bool)
+RABBITMQ_URL = config('RABBITMQ_URL', default='amqp://guest:guest@localhost:5672/')
+RABBITMQ_HIGHLIGHT_QUEUE = config('RABBITMQ_HIGHLIGHT_QUEUE', default='highlight.detect')
+RABBITMQ_HIGHLIGHT_EXCHANGE = config('RABBITMQ_HIGHLIGHT_EXCHANGE', default='highlight')
+RABBITMQ_HIGHLIGHT_ROUTING_KEY = config('RABBITMQ_HIGHLIGHT_ROUTING_KEY', default='highlight.results')
+HIGHLIGHT_WORKER_TIMEOUT_SEC = config('HIGHLIGHT_WORKER_TIMEOUT_SEC', default=900, cast=int)
 
 # IA
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')

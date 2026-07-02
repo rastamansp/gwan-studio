@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from .entities import Project, Source, Job, Thumbnail, SeoMetadata
+from .entities import Project, Source, Job, Thumbnail, SeoMetadata, HighlightMoment
 
 
 class IObjectStoragePort(ABC):
@@ -56,7 +56,7 @@ class IProjectRepository(ABC):
     def get(self, project_id: str) -> Project: ...
 
     @abstractmethod
-    def list(self) -> list[Project]: ...
+    def list(self, project_type: str | None = None) -> list[Project]: ...
 
 
 class ISourceRepository(ABC):
@@ -103,6 +103,28 @@ class IVideoWorkerPort(ABC):
 
     @abstractmethod
     def extract_frames(self, input_key: str, count: int) -> list[bytes]: ...
+
+
+class IHighlightAnalysisPort(ABC):
+    """F17 — análise semântica dos momentos de uma partida.
+
+    Implementações reais fundem transcrição (Whisper, hoje delegado a um
+    worker GPU externo — ver docs/spec/20-features/F17-futebol-highlights.md)
+    com os picos de energia do áudio. A porta isola essa dependência do
+    resto do pipeline, para que o adapter possa evoluir (Claude direto →
+    fila RabbitMQ + worker GPU) sem tocar nos use cases.
+    """
+
+    @abstractmethod
+    def detect_moments(
+        self,
+        energy_peaks: list[float],
+        duration_sec: float,
+        project_name: str,
+        importancia_min: int,
+    ) -> list[dict]:
+        """Retorna lista de `{timestamp, tipo, descricao, importancia}`."""
+        ...
 
 
 class IYouTubePort(ABC):

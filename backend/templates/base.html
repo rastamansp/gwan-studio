@@ -45,6 +45,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <script>
+    // Injeta o CSRF token em todo request HTMX (hx-post/hx-patch/hx-delete sem
+    // <form>{% csrf_token %}% — ex.: botões de deletar/toggle). Sem isso o
+    // Django CSRF middleware responde 403 em qualquer hx-post "solto".
+    (function () {
+      function getCookie(name) {
+        const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return match ? decodeURIComponent(match.pop()) : '';
+      }
+      document.body.addEventListener('htmx:configRequest', function (event) {
+        event.detail.headers['X-CSRFToken'] = getCookie('csrftoken');
+      });
+    })();
+  </script>
 
   <style>
     /* ── shadcn/ui design tokens ─────────────────────────────── */

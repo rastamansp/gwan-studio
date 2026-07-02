@@ -31,6 +31,7 @@ def run_ffmpeg_merge(source_paths: list[str], output_path: str) -> list[str]:
                 '-f', 'concat', '-safe', '0',
                 '-i', concat_file,
                 '-c', 'copy',
+                '-fflags', '+genpts',
                 output_path,
             ],
             capture_output=True,
@@ -42,6 +43,10 @@ def run_ffmpeg_merge(source_paths: list[str], output_path: str) -> list[str]:
             raise subprocess.CalledProcessError(
                 result.returncode, 'ffmpeg', stderr=result.stderr
             )
+        size_mb = os.path.getsize(output_path) / (1024 * 1024) if os.path.exists(output_path) else 0
+        log_lines.append(
+            f'[OK] Merge concluído — {os.path.basename(output_path)} ({size_mb:.1f} MB)'
+        )
         return log_lines
     finally:
         try:

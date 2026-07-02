@@ -69,6 +69,17 @@
 
   <!-- Navegação -->
   <div class="flex justify-end pt-1">
+    {% if project.is_futebol %}
+    <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
+            hx-get="/projects/{{ project.id }}/highlights/"
+            hx-target="#step-content"
+            hx-swap="innerHTML">
+      Próximo: Highlights
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    {% else %}
     <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
             hx-get="/projects/{{ project.id }}/merge/"
             hx-target="#step-content"
@@ -78,6 +89,7 @@
         <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
       </svg>
     </button>
+    {% endif %}
   </div>
 </div>
 

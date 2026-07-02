@@ -16,6 +16,8 @@ class DjangoProjectRepository(IProjectRepository):
                 'name': project.name,
                 'channel_name': project.channel_name,
                 'phase': project.phase,
+                'project_type': project.project_type,
+                'highlight_settings': project.highlight_settings,
             },
         )
         return _to_entity(obj)
@@ -28,11 +30,13 @@ class DjangoProjectRepository(IProjectRepository):
         obj = queryset.get(id=project_id)
         return _to_entity(obj)
 
-    def list(self) -> list[Project]:
+    def list(self, project_type: str | None = None) -> list[Project]:
         from studio.models import ProjectModel
         queryset = ProjectModel.objects.all()
         if self.owner is not None:
             queryset = queryset.filter(owner=self.owner)
+        if project_type:
+            queryset = queryset.filter(project_type=project_type)
         return [_to_entity(obj) for obj in queryset]
 
 
@@ -87,6 +91,8 @@ def _to_entity(obj) -> Project:
         name=obj.name,
         channel_name=obj.channel_name,
         phase=obj.phase,
+        project_type=obj.project_type,
+        highlight_settings=obj.highlight_settings or {},
         owner_id=obj.owner_id,
         created_at=obj.created_at,
         updated_at=obj.updated_at,

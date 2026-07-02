@@ -2,8 +2,11 @@
 import os
 import sys
 
+from config.load_env import load_env
+
 
 def main():
+    load_env()
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.phase0')
     try:
         from django.core.management import execute_from_command_line

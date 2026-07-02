@@ -26,6 +26,17 @@
     font-weight: 700;
   }
 
+  .projects-type-filter {
+    display: flex;
+    gap: 6px;
+  }
+
+  .projects-type-filter .app-button-secondary.is-active {
+    color: #ffffff;
+    background: #06111f;
+    border-color: #06111f;
+  }
+
   .projects-table {
     overflow: hidden;
   }
@@ -203,6 +214,11 @@
     <span>Buscar projeto</span>
     <span style="margin-left:auto; color:#94a3b8;">em breve</span>
   </div>
+  <div class="projects-type-filter" role="tablist" aria-label="Filtrar por tipo de projeto">
+    <a href="{% url 'project-list' %}" class="app-button-secondary{% if type_filter == 'all' %} is-active{% endif %}">Todos</a>
+    <a href="?type=gopro" class="app-button-secondary{% if type_filter == 'gopro' %} is-active{% endif %}">🎥 Go Pro</a>
+    <a href="?type=futebol" class="app-button-secondary{% if type_filter == 'futebol' %} is-active{% endif %}">⚽ Futebol</a>
+  </div>
   <a href="{% url 'dashboard' %}" class="app-button-secondary">Ver dashboard</a>
 </section>
 
@@ -226,7 +242,9 @@
       </span>
       <span>
         <span class="project-name">{{ project.name }}</span>
-        <span class="project-channel">{{ project.channel_name }}</span>
+        <span class="project-channel">
+          {% if project.is_futebol %}⚽ Futebol{% else %}🎥 Go Pro{% endif %} · {{ project.channel_name }}
+        </span>
       </span>
     </div>
     <span class="project-cell project-hide-md">

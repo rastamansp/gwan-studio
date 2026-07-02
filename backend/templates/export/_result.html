@@ -86,12 +86,12 @@
   <!-- Nav -->
   <div class="flex items-center justify-between pt-2">
     <button class="btn btn-ghost btn-sm gap-1.5 cursor-pointer"
-            hx-get="/projects/{{ project.id }}/merge/"
+            hx-get="/projects/{{ project.id }}/{% if project.is_futebol %}highlights{% else %}merge{% endif %}/"
             hx-target="#step-content" hx-swap="innerHTML">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
         <path fill-rule="evenodd" d="M9.78 11.78a.75.75 0 01-1.06 0L5.47 8.53a.75.75 0 010-1.06l3.25-3.25a.75.75 0 011.06 1.06L7.06 8l2.72 2.72a.75.75 0 010 1.06z" clip-rule="evenodd"/>
       </svg>
-      Merge
+      {% if project.is_futebol %}Highlights{% else %}Merge{% endif %}
     </button>
     <button class="btn btn-default btn-sm gap-1.5 cursor-pointer"
             hx-get="/projects/{{ project.id }}/thumbnail/"

@@ -27,3 +27,6 @@ backend/.env
 # OS
 .DS_Store
 Thumbs.db
+
+# Arquivos de teste locais (vídeos grandes, nunca versionar)
+arquivos_teste/

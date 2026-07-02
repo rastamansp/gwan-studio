@@ -317,6 +317,7 @@
         <div>
           <h3>{{ project.name }}</h3>
           <div class="recent-meta">
+            <span>{% if project.is_futebol %}⚽ Futebol{% else %}🎥 Go Pro{% endif %}</span>
             <span>{{ project.channel_name }}</span>
             <span>{{ project.sources_count }} clips</span>
             <span>{{ project.total_duration }}</span>

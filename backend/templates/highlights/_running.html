@@ -1,0 +1,121 @@
+{% comment %}
+F17 — Estado de execução da detecção de highlights. HTMX faz polling a cada 2s.
+{% endcomment %}
+<div class="space-y-5"
+     hx-get="/projects/{{ project.id }}/highlights/status/"
+     hx-trigger="every 2s"
+     hx-target="#step-content"
+     hx-swap="innerHTML">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">Detectando Highlights</h2>
+      <p class="text-sm text-muted-foreground mt-0.5">Áudio → picos de energia → análise semântica…</p>
+    </div>
+    <span class="badge badge-secondary flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+      Executando
+    </span>
+  </div>
+
+  <!-- Progress card -->
+  <div class="card px-4 py-5 space-y-3">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" class="w-4 h-4 text-primary animate-spin" style="animation-duration:2s">
+          <path d="M3 3.116a1.5 1.5 0 012.305-1.265l5.706 2.884a1.5 1.5 0 010 2.531L5.305 10.15A1.5 1.5 0 013 8.884V3.116z"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm font-medium">Extraindo áudio, detectando picos e analisando com IA</p>
+        <div class="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div class="h-full bg-primary rounded-full origin-left"
+               style="width: 60%; animation: indeterminate 1.5s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live log (WebSocket) -->
+  <div id="ws-live-logs-highlight"
+       class="card px-4 py-3 space-y-0.5 max-h-48 overflow-y-auto font-mono text-xs hidden">
+  </div>
+
+  <!-- Log do banco (fallback HTMX enquanto WS não conectar) -->
+  {% if job.logs %}
+  <div id="db-logs-highlight" class="card px-4 py-3 space-y-1 max-h-48 overflow-y-auto font-mono text-xs">
+    {% for entry in job.logs %}
+    <p class="{% if entry.type == 'error' %}text-destructive{% elif entry.type == 'progress' %}text-blue-400{% elif entry.type == 'success' %}text-green-400{% else %}text-muted-foreground{% endif %}">
+      {{ entry.text }}
+    </p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <script>
+  (function() {
+    var pid = '{{ project.id }}';
+    var statusUrl = '/projects/{{ project.id }}/highlights/status/';
+    var logEl = document.getElementById('ws-live-logs-highlight');
+    var dbEl  = document.getElementById('db-logs-highlight');
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    function appendLine(text, cls) {
+      var p = document.createElement('p');
+      p.className = cls || 'text-muted-foreground';
+      p.textContent = text;
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    function handleEvent(ev) {
+      if (!ev || ev.event !== 'job.update') return;
+      var d = ev.data || {};
+      if (d.type !== 'highlight_detect') return;
+      if (d.log_line) appendLine(d.log_line);
+      if (d.status === 'done' || d.status === 'failed') {
+        if (typeof htmx !== 'undefined')
+          htmx.ajax('GET', statusUrl, {target: '#step-content', swap: 'innerHTML'});
+      }
+    }
+    try {
+      var ws = new WebSocket(proto + '//' + location.host + '/ws/projects/' + pid + '/');
+      ws.onopen = function() {
+        logEl.classList.remove('hidden');
+        if (dbEl) dbEl.classList.add('hidden');
+      };
+      ws.onmessage = function(e) {
+        var msg; try { msg = JSON.parse(e.data); } catch(err) { return; }
+        if (msg.event === 'project.snapshot') {
+          (msg.data.recentEvents || []).forEach(handleEvent);
+        } else {
+          handleEvent(msg);
+        }
+      };
+    } catch(err) {}
+  })();
+  </script>
+
+  <!-- Nav desabilitada durante o job -->
+  <div class="flex items-center justify-between pt-2">
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-not-allowed opacity-40" disabled>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M9.78 11.78a.75.75 0 01-1.06 0L5.47 8.53a.75.75 0 010-1.06l3.25-3.25a.75.75 0 011.06 1.06L7.06 8l2.72 2.72a.75.75 0 010 1.06z" clip-rule="evenodd"/>
+      </svg>
+      Fontes
+    </button>
+    <button class="btn btn-ghost btn-sm gap-1.5 cursor-not-allowed opacity-40" disabled>
+      Próximo: Export
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+        <path fill-rule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L9.19 8 6.22 5.03a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<style>
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(1);   }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}
+</style>

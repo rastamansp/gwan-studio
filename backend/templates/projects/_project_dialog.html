@@ -20,6 +20,16 @@
         <input id="channel" type="text" name="channel_name" class="project-input" placeholder="@seucanal">
       </div>
 
+      <div class="project-field">
+        <label for="project_type">Tipo de projeto</label>
+        <select id="project_type" name="project_type" class="project-input">
+          <option value="gopro">Go Pro</option>
+          <option value="futebol">Futebol</option>
+        </select>
+      </div>
+      <!-- F17 — configurações de highlight (pre-roll, post-roll, importância min)
+           ficam na etapa "Highlights" do pipeline, não na criação do projeto. -->
+
       <div class="project-dialog-actions">
         <button type="button" class="app-button-secondary" onclick="document.getElementById('modal-new').close()">
           Cancelar

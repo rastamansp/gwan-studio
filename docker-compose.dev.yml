@@ -1,7 +1,12 @@
-version: '3.9'
-
-# Infraestrutura local para Fase A (PostgreSQL + Redis + MinIO)
+# Infraestrutura local para Fase A (PostgreSQL + Redis + MinIO + RabbitMQ + highlight-worker)
 # Fase 0 não precisa deste arquivo — só roda: python manage.py runserver 3018
+#
+# Agrupa TODOS os containers do projeto gwan-studio sob um único `name:` — aparecem
+# juntos em `docker ps` / Docker Desktop e sobem/descem com um único comando:
+#   docker compose -f docker-compose.dev.yml up -d          # infra (db/redis/minio/rabbitmq)
+#   docker compose -f docker-compose.dev.yml --profile worker up -d  # + highlight-worker (GPU, F17)
+#   docker compose -f docker-compose.dev.yml down
+name: gwan-studio-dev
 
 services:
   db:
@@ -47,6 +52,55 @@ services:
       timeout: 5s
       retries: 3
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5673:5672"    # slot 18 — evita colidir com RabbitMQ compartilhado (5672)
+      - "15673:15672"  # painel web
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Worker GPU da F17 (Whisper + Claude) — opt-in via `--profile worker` (exige --gpus,
+  # não roda em máquina sem GPU). Ver apps/ffmpeg-colab/highlight-worker/.
+  highlight-worker:
+    profiles: ["worker"]
+    build:
+      context: ../highlight-worker
+      dockerfile: Dockerfile
+    image: gwan/highlight-worker:local
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - STORAGE_BACKEND=minio
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=false
+      - MINIO_BUCKET=studio
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no .env}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-5}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-medium}
+    volumes:
+      - highlight_work:/app/.work
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
 volumes:
   pg_data:
   minio_data:
+  highlight_work:

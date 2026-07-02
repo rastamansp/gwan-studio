@@ -3,15 +3,29 @@ from django.conf import settings
 from django.db import models
 
 
+DEFAULT_HIGHLIGHT_SETTINGS = {
+    'pre_roll': 6.0,
+    'post_roll': 8.0,
+    'merge_gap': 4.0,
+    'top_n_peaks': 40,
+    'importancia_min': 5,
+}
+
+
 class ProjectModel(models.Model):
     class Phase(models.TextChoices):
         NEW = 'new', 'Novo'
         SOURCES_UPLOADED = 'sources_uploaded', 'Fontes Enviadas'
         MERGE_DONE = 'merge_done', 'Merge Concluído'
+        HIGHLIGHTS_DONE = 'highlights_done', 'Highlights Detectados'
         EXPORT_DONE = 'export_done', 'Export Pronto'
         THUMBNAILS_DONE = 'thumbnails_done', 'Thumbnails OK'
         SEO_APPROVED = 'seo_approved', 'SEO Aprovado'
         PUBLISHED    = 'published',   'Publicado'
+
+    class ProjectType(models.TextChoices):
+        GOPRO   = 'gopro',   'Go Pro'
+        FUTEBOL = 'futebol', 'Futebol'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(
@@ -23,6 +37,10 @@ class ProjectModel(models.Model):
     )
     name = models.CharField(max_length=255)
     channel_name = models.CharField(max_length=100, blank=True)
+    project_type = models.CharField(
+        max_length=20, choices=ProjectType.choices, default=ProjectType.GOPRO,
+    )
+    highlight_settings = models.JSONField(default=dict, blank=True)
     phase = models.CharField(max_length=30, choices=Phase.choices, default=Phase.NEW)
     oauth_refresh_token_enc = models.CharField(max_length=512, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -58,6 +76,59 @@ class SourceModel(models.Model):
         db_table = 'studio_source'
 
 
+class HighlightMomentModel(models.Model):
+    """F17 — momento relevante detectado no pipeline de futebol."""
+
+    class Tipo(models.TextChoices):
+        GOL       = 'gol',       'Gol'
+        DEFESA    = 'defesa',    'Defesa'
+        PENALTI   = 'penalti',   'Pênalti'
+        FALTA     = 'falta',     'Falta'
+        EXPULSAO  = 'expulsao',  'Expulsão'
+        CHANCE    = 'chance',    'Chance'
+        OUTRO     = 'outro',     'Outro'
+
+    id            = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project       = models.ForeignKey(ProjectModel, on_delete=models.CASCADE, related_name='highlight_moments')
+    source        = models.ForeignKey(
+        'SourceModel', on_delete=models.CASCADE, related_name='highlight_moments',
+        null=True, blank=True,
+    )
+    timestamp_sec = models.FloatField()
+    tipo          = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.OUTRO)
+    descricao     = models.TextField(blank=True)
+    importancia   = models.IntegerField(default=0)
+    included      = models.BooleanField(default=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp_sec']
+        db_table = 'studio_highlight_moment'
+
+    def __str__(self):
+        return f"[{self.tipo}] {self.timestamp_sec:.0f}s — {self.project}"
+
+
+class HighlightClipModel(models.Model):
+    """F18 — plano de corte persistido (EDL), editável no editor de timeline."""
+
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project    = models.ForeignKey(ProjectModel, on_delete=models.CASCADE, related_name='highlight_clips')
+    source     = models.ForeignKey('SourceModel', on_delete=models.CASCADE, related_name='highlight_clips')
+    start_sec  = models.FloatField()
+    end_sec    = models.FloatField()
+    order      = models.IntegerField(default=0)
+    included   = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        db_table = 'studio_highlight_clip'
+
+    def __str__(self):
+        return f"clip {self.start_sec:.1f}s-{self.end_sec:.1f}s — {self.project}"
+
+
 class JobModel(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Aguardando'
@@ -66,11 +137,12 @@ class JobModel(models.Model):
         FAILED  = 'failed',  'Falhou'
 
     class JobType(models.TextChoices):
-        MERGE     = 'merge',     'Merge'
-        EXPORT    = 'export',    'Export'
-        THUMBNAIL = 'thumbnail', 'Thumbnail'
-        SEO       = 'seo',       'SEO'
-        PUBLISH   = 'publish',   'Publicar'
+        MERGE             = 'merge',             'Merge'
+        HIGHLIGHT_DETECT  = 'highlight_detect',  'Detecção de Highlights'
+        EXPORT            = 'export',            'Export'
+        THUMBNAIL         = 'thumbnail',         'Thumbnail'
+        SEO               = 'seo',               'SEO'
+        PUBLISH           = 'publish',            'Publicar'
 
     id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project      = models.ForeignKey(ProjectModel, on_delete=models.CASCADE, related_name='jobs')
