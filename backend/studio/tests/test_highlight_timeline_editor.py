@@ -5,11 +5,28 @@ tela do editor, validação e recorte via /highlights/editor/save/.
 import json
 import os
 import uuid
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from studio.models import HighlightClipModel, HighlightMomentModel, JobModel, ProjectModel, SourceModel
+
+
+class SyncThread:
+    """Substitui threading.Thread nos testes: start() roda o target na hora.
+
+    Necessário porque TestCase roda em transação não commitada — uma thread
+    de verdade, com sua própria conexão, não enxergaria os dados até o
+    commit (que só acontece ao final do teste).
+    """
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+
+    def start(self):
+        self._target(*self._args, **self._kwargs)
 
 
 def _write_dummy_video(project_id: str, source_id: str) -> str:
@@ -117,8 +134,33 @@ class HighlightsEditorViewTests(TestCase):
         resp = self.client.get(f'/projects/{self.project.id}/sources/{uuid.uuid4()}/preview/')
         self.assertEqual(resp.status_code, 404)
 
+    def test_merged_preview_404_before_any_cut(self):
+        resp = self.client.get(f'/projects/{self.project.id}/highlights/merged-preview/')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_merged_preview_streams_inline_after_cut(self):
+        from infrastructure.storage import get_storage
+        storage = get_storage()
+        key = f'studio/{self.project.id}/merged/merged.mp4'
+        path = storage.resolve_write_path(key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            f.write(b'\x00' * 32)
+        storage.finalize_write(key, path, 'video/mp4')
+
+        resp = self.client.get(f'/projects/{self.project.id}/highlights/merged-preview/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn('attachment', resp.get('Content-Disposition', ''))
+
+    def test_editor_page_reports_merged_availability(self):
+        resp = self.client.get(f'/projects/{self.project.id}/highlights/editor/')
+        self.assertContains(resp, 'timelineEditor(')
+        # sem merged.mp4 ainda -> terceiro argumento deve ser `false`
+        self.assertRegex(resp.content.decode(), r"timelineEditor\(.*,\s*false\)")
+
 
 @override_settings(HIGHLIGHT_SIMULATE=True)
+@patch('presentation.views.projects.threading.Thread', SyncThread)
 class HighlightsEditorSaveTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='coach', password='x')
@@ -145,17 +187,32 @@ class HighlightsEditorSaveTests(TestCase):
             content_type='application/json',
         )
 
+    def _wait_for_job(self, job_id, timeout=5):
+        import time
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            job = JobModel.objects.get(id=job_id)
+            if job.status in ('done', 'failed'):
+                return job
+            time.sleep(0.05)
+        self.fail(f'job {job_id} não concluiu em {timeout}s')
+
     def test_extends_clip_end_and_recuts(self):
         resp = self._save([
             {'id': str(self.clip_a.id), 'start_sec': 10.0, 'end_sec': 25.0, 'included': True},
             {'id': str(self.clip_b.id), 'start_sec': 30.0, 'end_sec': 40.0, 'included': True},
         ])
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 202)
         data = resp.json()
         self.assertTrue(data['ok'])
-        self.assertEqual(data['result']['num_clips'], 2)
+        self.assertIn('job_id', data)
         self.clip_a.refresh_from_db()
-        self.assertEqual(self.clip_a.end_sec, 25.0)
+        self.assertEqual(self.clip_a.end_sec, 25.0)  # persistido antes do recorte assíncrono iniciar
+
+        job = self._wait_for_job(data['job_id'])
+        self.assertEqual(job.status, 'done')
+        self.assertEqual(job.result['num_clips'], 2)
+        self.assertEqual(job.job_type, 'highlight_recut')
 
     def test_rejects_overlapping_clips(self):
         resp = self._save([
@@ -188,7 +245,8 @@ class HighlightsEditorSaveTests(TestCase):
             {'id': str(self.clip_a.id), 'start_sec': 10.0, 'end_sec': 35.0, 'included': False},
             {'id': str(self.clip_b.id), 'start_sec': 30.0, 'end_sec': 40.0, 'included': True},
         ])
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 202)
+        self._wait_for_job(resp.json()['job_id'])
 
     def test_removes_included_moment_via_toggle_does_not_affect_clips(self):
         HighlightMomentModel.objects.create(
@@ -199,5 +257,6 @@ class HighlightsEditorSaveTests(TestCase):
             {'id': str(self.clip_a.id), 'start_sec': 10.0, 'end_sec': 20.0, 'included': True},
             {'id': str(self.clip_b.id), 'start_sec': 30.0, 'end_sec': 40.0, 'included': True},
         ])
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 202)
+        self._wait_for_job(resp.json()['job_id'])
         self.assertEqual(HighlightMomentModel.objects.filter(project=self.project).count(), 1)

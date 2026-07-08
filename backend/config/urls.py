@@ -67,6 +67,11 @@ urlpatterns = [
         name='highlights-editor-save',
     ),
     path(
+        'projects/<str:project_id>/highlights/merged-preview/',
+        login_required(projects.highlights_merged_preview),
+        name='highlights-merged-preview',
+    ),
+    path(
         'projects/<str:project_id>/highlights/<str:moment_id>/toggle/',
         login_required(projects.highlight_toggle),
         name='highlight-toggle',

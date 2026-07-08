@@ -1014,6 +1014,7 @@ def highlights_editor(request, project_id):
         'project': pd,
         'sources_data_json': json.dumps(sources_data, ensure_ascii=False),
         'is_exported': pd['phase'] in EXPORTED_PHASES,
+        'merged_available': get_storage().object_exists(f'studio/{project_id}/merged/merged.mp4'),
     })
 
 
@@ -1079,18 +1080,53 @@ def highlights_editor_save(request, project_id):
         clip.included = included
         clip.save(update_fields=['start_sec', 'end_sec', 'included'])
 
-    simulate = getattr(settings, 'HIGHLIGHT_SIMULATE', True)
-    try:
-        result, _logs = _cut_highlight_from_clips(project_id, simulate=simulate)
-    except Exception as exc:
-        return JsonResponse({'error': str(exc)}, status=400)
-
+    from studio.models import JobModel
     project_obj = _project_obj_or_404(request, project_id)
+    job = JobModel.objects.create(project=project_obj, job_type='highlight_recut', status='pending')
+    threading.Thread(target=_run_recut_job, args=(str(job.id), project_id), daemon=True).start()
+
     return JsonResponse({
         'ok': True,
-        'result': result,
+        'job_id': str(job.id),
+        'status': job.status,
         'is_exported': _project_is_exported(project_obj),
-    })
+    }, status=202)
+
+
+def _run_recut_job(job_id: str, project_id: str) -> None:
+    """F18 — recorte assíncrono disparado pelo editor de timeline: só FFmpeg
+    (cut_and_concat), sem repetir Whisper/Claude. Ver REQ-F18-06."""
+    from studio.models import JobModel
+    try:
+        job = JobModel.objects.get(id=job_id)
+        job.status = 'running'
+        job.save(update_fields=['status', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'highlight_recut', 'status': 'running',
+        }})
+
+        simulate = getattr(settings, 'HIGHLIGHT_SIMULATE', True)
+        result, cut_logs = _cut_highlight_from_clips(project_id, simulate=simulate)
+
+        job.status = 'done'
+        job.logs = [{'text': line, 'type': _log_type(line)} for line in cut_logs]
+        job.result = result
+        job.save(update_fields=['status', 'logs', 'result', 'updated_at'])
+        _emit_job_event(project_id, {'event': 'job.update', 'data': {
+            'jobId': job_id, 'type': 'highlight_recut', 'status': 'done',
+            'output_params': {'size_bytes': result['size_bytes']},
+        }})
+    except Exception as exc:
+        try:
+            job = JobModel.objects.get(id=job_id)
+            job.status = 'failed'
+            job.error = str(exc)
+            job.save(update_fields=['status', 'error', 'updated_at'])
+            _emit_job_event(project_id, {'event': 'job.update', 'data': {
+                'jobId': job_id, 'type': 'highlight_recut', 'status': 'failed', 'error': str(exc),
+            }})
+        except Exception:
+            pass
 
 
 def _latest_export_job(project_id):
@@ -1282,6 +1318,23 @@ def export_preview(request, project_id):
             content_type='video/mp4',
         )
     return HttpResponseRedirect(storage.get_presigned_url(final_key, expires=3600))
+
+
+def highlights_merged_preview(request, project_id):
+    """F18 — stream inline do merged.mp4 (resultado do highlight), para a
+    prévia dentro do próprio editor de timeline, sem navegar para outra tela."""
+    _project_obj_or_404(request, project_id)
+    from django.http import FileResponse, Http404, HttpResponseRedirect
+    storage = get_storage()
+    merged_key = f'studio/{project_id}/merged/merged.mp4'
+    if not storage.object_exists(merged_key):
+        raise Http404
+    if storage.is_local:
+        return FileResponse(
+            open(storage.resolve_read_path(merged_key), 'rb'),
+            content_type='video/mp4',
+        )
+    return HttpResponseRedirect(storage.get_presigned_url(merged_key, expires=3600))
 
 
 def _latest_thumbnail_job(project_id):

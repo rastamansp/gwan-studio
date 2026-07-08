@@ -76,6 +76,13 @@ class MinioStorageAdapter(IObjectStoragePort):
             key,
             ExtraArgs={'ContentType': content_type},
         )
+        # Atualiza o cache de leitura com o arquivo recém-escrito: sem isso, um
+        # `key` regravado (ex.: F18 recortando o merged.mp4 de novo) continuaria
+        # servindo bytes antigos em resolve_read_path() até o processo reiniciar.
+        import shutil
+        cache_path = self._cache / _cache_filename(key)
+        if os.path.abspath(local_path) != os.path.abspath(cache_path):
+            shutil.copy2(local_path, cache_path)
 
     def object_exists(self, key: str) -> bool:
         try:

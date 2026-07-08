@@ -139,6 +139,7 @@ class JobModel(models.Model):
     class JobType(models.TextChoices):
         MERGE             = 'merge',             'Merge'
         HIGHLIGHT_DETECT  = 'highlight_detect',  'Detecção de Highlights'
+        HIGHLIGHT_RECUT   = 'highlight_recut',   'Recorte de Highlights'
         EXPORT            = 'export',            'Export'
         THUMBNAIL         = 'thumbnail',         'Thumbnail'
         SEO               = 'seo',               'SEO'

@@ -133,7 +133,7 @@
 </div>
 {% endif %}
 
-<div id="editor-root" x-data="timelineEditor({{ sources_data_json }}, '{{ project.id }}')" class="space-y-6">
+<div id="editor-root" x-data="timelineEditor({{ sources_data_json }}, '{{ project.id }}', {{ merged_available|yesno:'true,false' }})" class="space-y-6">
   <template x-for="(entry, sIdx) in sources" :key="entry.source.id">
     <section class="panel" style="padding:16px;">
       <div class="flex items-center justify-between" style="margin-bottom:10px;">
@@ -203,21 +203,30 @@
     </div>
   </template>
 
-  <div class="flex items-center justify-between panel" style="padding:14px 16px;">
-    <p class="text-xs" style="color:#64748b;" x-show="!saving && !saveError && !saveSuccess">
-      Ajustes não salvos são perdidos ao sair da página.
-    </p>
-    <p class="text-xs" style="color:#b91c1c;" x-show="saveError" x-text="saveError"></p>
-    <p class="text-xs" style="color:#047857;" x-show="saveSuccess" x-text="saveSuccess"></p>
-    <button type="button" class="app-button" :disabled="saving" @click="save()">
-      <span x-show="!saving">Salvar cortes</span>
-      <span x-show="saving">Recortando...</span>
-    </button>
+  <div class="panel" style="padding:14px 16px;">
+    <div class="flex items-center justify-between">
+      <p class="text-xs" style="color:#64748b;" x-show="!saving && !saveError && !saveSuccess">
+        Ajustes não salvos são perdidos ao sair da página.
+      </p>
+      <p class="text-xs" style="color:#b91c1c;" x-show="saveError" x-text="saveError"></p>
+      <p class="text-xs" style="color:#047857;" x-show="saveSuccess" x-text="saveSuccess"></p>
+      <button type="button" class="app-button" :disabled="saving" @click="save()">
+        <span x-show="!saving">Salvar cortes</span>
+        <span x-show="saving" x-text="'Recortando' + '.'.repeat(dots) "></span>
+      </button>
+    </div>
+
+    <!-- F18 roadmap: prévia do merged.mp4 sem sair do editor -->
+    <div x-show="mergedAvailable" x-cloak style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:14px;">
+      <p class="text-xs font-semibold" style="color:#334155; margin-bottom:8px;">Prévia do highlight (merged.mp4)</p>
+      <video controls preload="metadata" class="w-full bg-black rounded-lg" style="max-height:320px;"
+             :src="mergedPreviewUrl()"></video>
+    </div>
   </div>
 </div>
 
 <script>
-function timelineEditor(initialSources, projectId) {
+function timelineEditor(initialSources, projectId, mergedAvailable) {
   return {
     projectId,
     sources: initialSources,
@@ -225,6 +234,14 @@ function timelineEditor(initialSources, projectId) {
     saving: false,
     saveError: '',
     saveSuccess: '',
+    mergedAvailable,
+    dots: 1,
+    previewCacheBust: Date.now(),
+    pollTimer: null,
+
+    mergedPreviewUrl() {
+      return '/projects/' + this.projectId + '/highlights/merged-preview/?v=' + this.previewCacheBust;
+    },
 
     fmt(sec) {
       sec = Math.max(0, Math.round(sec || 0));
@@ -302,6 +319,7 @@ function timelineEditor(initialSources, projectId) {
       this.saving = true;
       this.saveError = '';
       this.saveSuccess = '';
+      this.dots = 1;
 
       const clips = this.sources.flatMap(entry => entry.clips.map(c => ({
         id: c.id, start_sec: c.start_sec, end_sec: c.end_sec, included: c.included,
@@ -315,11 +333,41 @@ function timelineEditor(initialSources, projectId) {
       })
         .then(r => r.json().then(data => ({ ok: r.ok, data })))
         .then(({ ok, data }) => {
-          if (!ok) { this.saveError = data.error || 'Falha ao salvar cortes.'; return; }
-          this.saveSuccess = `Highlight recortado — ${data.result.num_clips} clipe(s), ${Math.round(data.result.size_bytes / 1024 / 1024)} MB.`;
+          if (!ok) { this.saving = false; this.saveError = data.error || 'Falha ao salvar cortes.'; return; }
+          this.pollRecutJob(data.job_id);
         })
-        .catch(() => { this.saveError = 'Falha de conexão ao salvar.'; })
-        .finally(() => { this.saving = false; });
+        .catch(() => { this.saving = false; this.saveError = 'Falha de conexão ao salvar.'; });
+    },
+
+    // REQ-F18 (roadmap): recorte assíncrono — o FFmpeg roda em background
+    // (mesmo padrão de job dos outros steps do pipeline); aqui só faz
+    // polling em /api/projects/:id/jobs/:jobId/ até done/failed.
+    pollRecutJob(jobId) {
+      if (this.pollTimer) clearInterval(this.pollTimer);
+      this.pollTimer = setInterval(() => {
+        this.dots = (this.dots % 3) + 1;
+        fetch('/api/projects/' + this.projectId + '/jobs/' + jobId + '/')
+          .then(r => r.json())
+          .then(job => {
+            if (job.status === 'done') {
+              clearInterval(this.pollTimer);
+              this.saving = false;
+              this.mergedAvailable = true;
+              this.previewCacheBust = Date.now();
+              const mb = Math.round((job.result?.size_bytes || 0) / 1024 / 1024);
+              this.saveSuccess = `Highlight recortado — ${job.result?.num_clips ?? '?'} clipe(s), ${mb} MB.`;
+            } else if (job.status === 'failed') {
+              clearInterval(this.pollTimer);
+              this.saving = false;
+              this.saveError = job.error || 'Falha ao recortar o highlight.';
+            }
+          })
+          .catch(() => {
+            clearInterval(this.pollTimer);
+            this.saving = false;
+            this.saveError = 'Falha de conexão ao acompanhar o recorte.';
+          });
+      }, 1500);
     },
   };
 }
