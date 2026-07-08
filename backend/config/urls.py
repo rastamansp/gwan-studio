@@ -27,6 +27,11 @@ urlpatterns = [
     path('projects/<str:project_id>/', login_required(projects.project_detail), name='project-detail'),
     path('projects/<str:project_id>/sources/', login_required(projects.sources_step), name='sources-step'),
     path('projects/<str:project_id>/sources/upload/', login_required(projects.upload_source), name='source-upload'),
+    path(
+        'projects/<str:project_id>/sources/from-youtube/',
+        login_required(projects.import_source_from_youtube),
+        name='source-from-youtube',
+    ),
     path('projects/<str:project_id>/sources/list/', login_required(projects.source_list_partial), name='source-list'),
     path(
         'projects/<str:project_id>/sources/<str:source_id>/delete/',

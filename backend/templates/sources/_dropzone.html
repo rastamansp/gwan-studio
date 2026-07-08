@@ -1,4 +1,4 @@
-<div class="space-y-5" x-data="sourceUploader('{{ project.id }}', {{ sources|length }})">
+<div class="space-y-5" x-data="sourceUploader('{{ project.id }}', {{ sources|length }})" x-init="init()">
 
   <!-- Header -->
   <div class="flex items-center justify-between">
@@ -36,6 +36,26 @@
     <input type="file" multiple accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.mov,.avi,.mkv"
            class="hidden" @change="handleFiles($event.target.files)">
   </label>
+
+  <!-- Alternativa: importar de um link do YouTube -->
+  <div class="flex items-center gap-2">
+    <div class="flex-1 h-px bg-border"></div>
+    <span class="text-xs text-muted-foreground">ou</span>
+    <div class="flex-1 h-px bg-border"></div>
+  </div>
+  <form class="flex items-center gap-2" @submit.prevent="importFromYoutube()">
+    <input type="url" x-model="youtubeUrl" placeholder="Cole o link de um vídeo do YouTube (youtube.com/watch?v=... ou youtu.be/...)"
+           class="project-input flex-1" :disabled="importingYoutube">
+    <button type="submit" class="btn btn-outline btn-sm gap-1.5" :disabled="importingYoutube || !youtubeUrl">
+      <svg x-show="!importingYoutube" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-red-500">
+        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/>
+        <path d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="white"/>
+      </svg>
+      <span x-show="importingYoutube" class="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
+      <span x-text="importingYoutube ? 'Importando...' : 'Importar do YouTube'"></span>
+    </button>
+  </form>
+  <p class="text-xs text-destructive" x-show="youtubeError" x-text="youtubeError" x-cloak></p>
 
   <!-- Fila de upload (progress bars) -->
   <template x-if="queue.length > 0">
@@ -99,6 +119,61 @@ function sourceUploader(projectId, initialCount) {
     dragging: false,
     queue: [],
     totalCount: initialCount,
+    youtubeUrl: '',
+    importingYoutube: false,
+    youtubeError: '',
+
+    init() {
+      // Se a página recarregou com um import do YouTube ainda em andamento,
+      // retoma o polling em vez de deixar o status "uploading" congelado.
+      const list = document.getElementById('source-list');
+      if (list && list.innerHTML.includes('>uploading<')) {
+        this.refreshSourceListUntilReady();
+      }
+    },
+
+    importFromYoutube() {
+      if (this.importingYoutube || !this.youtubeUrl) return;
+      this.importingYoutube = true;
+      this.youtubeError = '';
+
+      const formData = new FormData();
+      formData.append('url', this.youtubeUrl);
+      formData.append('csrfmiddlewaretoken', this.getCsrf());
+
+      fetch(`/projects/${projectId}/sources/from-youtube/`, { method: 'POST', body: formData })
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) { this.youtubeError = data.error || 'Falha ao importar do YouTube.'; return; }
+          this.youtubeUrl = '';
+          this.totalCount++;
+          this.refreshSourceListUntilReady();
+        })
+        .catch(() => { this.youtubeError = 'Falha de conexão ao importar.'; })
+        .finally(() => { this.importingYoutube = false; });
+    },
+
+    // O download do YouTube roda em background no servidor; aqui só
+    // atualiza a lista de sources periodicamente enquanto algum item
+    // ainda estiver com status "uploading" (download em andamento).
+    refreshSourceListUntilReady() {
+      const poll = () => {
+        fetch(`/projects/${projectId}/sources/list/`)
+          .then(r => r.text())
+          .then(html => {
+            const target = document.getElementById('source-list');
+            if (target) {
+              target.innerHTML = html;
+              if (typeof htmx !== 'undefined') htmx.process(target);
+            }
+            if (html.includes('>uploading<')) {
+              setTimeout(poll, 3000);
+            }
+          })
+          .catch(() => {});
+      };
+      poll();
+    },
 
     handleDrop(event) {
       this.handleFiles(event.dataTransfer.files);

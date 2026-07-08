@@ -2169,6 +2169,91 @@ def upload_source(request, project_id):
     })
 
 
+def import_source_from_youtube(request, project_id):
+    """Alternativa ao upload de arquivo: baixa o vídeo direto de um link do
+    YouTube (yt-dlp) e cria o Source normalmente assim que o download termina."""
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    project_obj = _project_obj_or_404(request, project_id)
+
+    from infrastructure.youtube.downloader import is_youtube_url
+
+    url = (request.POST.get('url') or '').strip()
+    if not url:
+        return JsonResponse({'error': 'Informe o link do YouTube'}, status=400)
+    if not is_youtube_url(url):
+        return JsonResponse(
+            {'error': 'Link não reconhecido como YouTube (use youtube.com/watch, youtu.be ou /shorts)'}, status=400,
+        )
+
+    from studio.models import SourceModel
+
+    source_id = str(uuid.uuid4())
+    count = SourceModel.objects.filter(project=project_obj).count()
+    source = SourceModel.objects.create(
+        id=source_id,
+        project=project_obj,
+        original_filename='Baixando do YouTube…',
+        camera='youtube',
+        duration_sec=0,
+        size_bytes=0,
+        status='uploading',
+        storage_key='',
+        sort_order=count,
+    )
+
+    threading.Thread(
+        target=_run_youtube_import, args=(str(source.id), project_id, url), daemon=True,
+    ).start()
+
+    return JsonResponse({'id': str(source.id), 'status': 'uploading'}, status=202)
+
+
+def _run_youtube_import(source_id: str, project_id: str, url: str) -> None:
+    import shutil
+    import tempfile
+
+    from infrastructure.youtube.downloader import YouTubeDownloadError, download_youtube_video
+    from studio.models import ProjectModel, SourceModel
+
+    storage = get_storage()
+    tmp_dir = tempfile.mkdtemp(prefix='yt_import_')
+    try:
+        info = download_youtube_video(url, os.path.join(tmp_dir, source_id))
+        local_path = info['filepath']
+        filename = os.path.basename(local_path)
+        storage_key = f'studio/{project_id}/sources/{source_id}-{filename}'
+
+        size_bytes = os.path.getsize(local_path)
+        write_path = storage.resolve_write_path(storage_key)
+        shutil.copy2(local_path, write_path)
+        storage.finalize_write(storage_key, write_path, 'video/mp4')
+
+        source = SourceModel.objects.get(id=source_id)
+        source.original_filename = filename
+        source.duration_sec = info['duration_sec']
+        source.size_bytes = size_bytes
+        source.storage_key = storage_key
+        source.status = 'ready'
+        source.save(update_fields=['original_filename', 'duration_sec', 'size_bytes', 'storage_key', 'status'])
+
+        project_obj = ProjectModel.objects.get(id=project_id)
+        if project_obj.phase == 'new':
+            project_obj.phase = 'sources_uploaded'
+            project_obj.save(update_fields=['phase', 'updated_at'])
+
+    except YouTubeDownloadError as exc:
+        SourceModel.objects.filter(id=source_id).update(
+            status='error', original_filename=f'Erro ao baixar: {str(exc)[:200]}',
+        )
+    except Exception as exc:
+        SourceModel.objects.filter(id=source_id).update(
+            status='error', original_filename=f'Erro: {str(exc)[:200]}',
+        )
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def source_preview(request, project_id, source_id):
     """F18 — stream inline do vídeo de origem (não o highlight cortado), para
     o player do editor de timeline."""
