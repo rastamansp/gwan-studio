@@ -46,6 +46,27 @@ class IsYoutubeUrlTests(TestCase):
         self.assertFalse(is_youtube_url(None))
 
 
+class DownloadYoutubeVideoRetryConfigTests(TestCase):
+    """Downloads longos (jogos > 1h) são mais sujeitos a quedas de conexão
+    intermitentes no meio do stream — sem retry, um erro parcial derruba o
+    import inteiro em vez de só tentar de novo o pedaço que faltou."""
+
+    @patch('yt_dlp.YoutubeDL')
+    def test_configures_retries_and_timeout(self, mock_ydl_cls):
+        from infrastructure.youtube.downloader import download_youtube_video
+
+        mock_ydl = mock_ydl_cls.return_value.__enter__.return_value
+        mock_ydl.extract_info.return_value = {'title': 't', 'duration': 10}
+        mock_ydl.prepare_filename.return_value = '/tmp/x.mp4'
+
+        download_youtube_video('https://youtu.be/x', '/tmp/x')
+
+        opts = mock_ydl_cls.call_args[0][0]
+        self.assertGreaterEqual(opts.get('retries', 0), 5)
+        self.assertGreaterEqual(opts.get('fragment_retries', 0), 5)
+        self.assertIn('socket_timeout', opts)
+
+
 @patch('presentation.views.projects.threading.Thread', SyncThread)
 class ImportSourceFromYoutubeViewTests(TestCase):
     def setUp(self):

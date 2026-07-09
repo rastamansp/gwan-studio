@@ -35,6 +35,13 @@ def download_youtube_video(url: str, output_path_no_ext: str) -> dict:
         'quiet': True,
         'no_warnings': True,
         'restrictfilenames': True,
+        # Downloads longos (jogos de futebol podem passar de 1h) são mais
+        # sujeitos a quedas de conexão intermitentes — sem retry, um "Got
+        # error: N bytes read, M more expected" no meio do download derruba
+        # o import inteiro em vez de só tentar de novo o pedaço que faltou.
+        'retries': 10,
+        'fragment_retries': 10,
+        'socket_timeout': 30,
     }
 
     try:
