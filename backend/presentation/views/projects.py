@@ -38,18 +38,20 @@ PHASE_STEP_INDEX = {
     'merge_done':       2,
     'highlights_done':  2,
     'export_done':      3,
-    'thumbnails_done':  4,
-    'seo_approved':     5,
+    'seo_approved':     4,
+    'thumbnails_done':  5,
     'published':        5,
 }
 
 # Pipeline "Go Pro" (F03): merge manual de clipes.
+# SEO roda antes de Thumbnails — o título/contexto gerado pelo SEO alimenta o
+# planejamento visual das thumbnails (Claude Vision usa o título SEO como base).
 STEPS_META = [
     ('sources',   'Fontes'),
     ('merge',     'Merge'),
     ('export',    'Export'),
-    ('thumbnail', 'Thumbnails'),
     ('seo',       'SEO'),
+    ('thumbnail', 'Thumbnails'),
     ('publish',   'Publicar'),
 ]
 
@@ -58,8 +60,8 @@ STEPS_META_FUTEBOL = [
     ('sources',    'Fontes'),
     ('highlights', 'Highlights'),
     ('export',     'Export'),
-    ('thumbnail',  'Thumbnails'),
     ('seo',        'SEO'),
+    ('thumbnail',  'Thumbnails'),
     ('publish',    'Publicar'),
 ]
 
@@ -1425,7 +1427,7 @@ def _simulated_plans(project_name: str) -> list[dict]:
     ]
 
 
-def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
+def _run_thumbnail_job(job_id: str, project_id: str, project_name: str, seo_title: str = '') -> None:
     from studio.models import JobModel, ProjectModel, ThumbnailModel
     from infrastructure.image.thumbnail_renderer import render_thumbnail
     logs = []
@@ -1457,9 +1459,11 @@ def _run_thumbnail_job(job_id: str, project_id: str, project_name: str) -> None:
             frames_b64 = extract_frames(video_path, n=6)
             logs.append({'text': f'{len(frames_b64)} frames extraídos', 'type': 'success'})
 
+            if seo_title:
+                logs.append({'text': f'Usando título SEO como base: "{seo_title}"', 'type': 'info'})
             logs.append({'text': 'Chamando Claude Vision para planejamento…', 'type': 'info'})
             from infrastructure.ai.thumbnail_planner import plan_thumbnails
-            plans = plan_thumbnails(frames_b64, project_name, api_key=api_key)
+            plans = plan_thumbnails(frames_b64, project_name, seo_title=seo_title, api_key=api_key)
             logs.append({'text': '3 planos recebidos do Claude', 'type': 'success'})
 
         # Deletar thumbnails anteriores
@@ -1512,6 +1516,9 @@ def thumbnail_generate(request, project_id):
     from studio.models import JobModel
     project_obj = _project_obj_or_404(request, project_id)
 
+    seo = _get_seo(project_id)
+    seo_title = seo.title if seo else ''
+
     job = JobModel.objects.create(
         project=project_obj,
         job_type='thumbnail',
@@ -1519,7 +1526,7 @@ def thumbnail_generate(request, project_id):
     )
     threading.Thread(
         target=_run_thumbnail_job,
-        args=(str(job.id), project_id, project_obj.name),
+        args=(str(job.id), project_id, project_obj.name, seo_title),
         daemon=True,
     ).start()
 

@@ -30,7 +30,8 @@ Substitui o merge manual (F03) quando project_type = futebol.
   {% endif %}
 
   <!-- Configurações (highlight_settings do projeto) -->
-  <form method="POST" action="/projects/{{ project.id }}/highlights/start/" id="highlight-form" class="space-y-4">
+  <form hx-post="/projects/{{ project.id }}/highlights/start/" hx-target="#step-content" hx-swap="innerHTML"
+        id="highlight-form" class="space-y-4">
     {% csrf_token %}
 
     <details class="group card px-4 py-3">
