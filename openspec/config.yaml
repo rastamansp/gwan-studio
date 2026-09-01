@@ -1,0 +1,52 @@
+schema: spec-driven
+
+context: |
+  Gwan Studio — plataforma web de produção de vídeo para YouTube. Sub-app do
+  ffmpeg-colab no ecossistema gwan.cloud. O usuário sobe clipes brutos e passa
+  por um pipeline guiado: merge -> export -> thumbnails IA -> SEO IA -> publicar.
+  Deploy em produção via Portainer (studio.gwan.cloud), NUNCA via SSH.
+
+  Stack:
+  - Django 5.2 LTS + HTMX 2 + Alpine.js + Tailwind (sem SPA framework).
+  - Django Channels (WebSocket) para streaming de logs de job em tempo real.
+  - FFmpeg (merge stream-copy / export re-encode), Pillow (render de thumbnail).
+  - Claude API (Vision para planejar thumbnails; SEO em pt-BR).
+  - YouTube Data API v3 (OAuth 2.0) para publicação.
+  - PostgreSQL + Redis (Channels layer) + MinIO/S3 para storage.
+
+  Arquitetura Clean (backend/):
+  - presentation/ — views HTMX + Alpine.js; WebSocket ws/projects/<id>/.
+  - application/ — use cases (orquestração pura, SEM imports Django).
+  - domain/ — entities + ports (ABCs).
+  - infrastructure/ — ffmpeg/ ai/ image/ storage/ ws/ youtube/ orm/.
+  - studio/ — Django app: modelos ORM (ProjectModel, JobModel ...).
+
+  Features: F01 Projetos · F02 Upload de fontes · F03 Merge · F04 Export ·
+  F05 Thumbnails IA · F06 SEO IA · F07 Publicar (YouTube) · F08 Storage
+  (Local | MinIO/S3, porta transparente) · F09 WebSocket + REST de jobs.
+
+  Regras de domínio não negociáveis:
+  - Storage é uma PORTA transparente: use cases nunca conhecem se é filesystem
+    ou MinIO; adapters LocalStorageAdapter | MinioStorageAdapter.
+  - application/ e domain/ NUNCA importam Django (Clean Architecture estrita).
+  - Nenhum segredo versionado; credenciais só via .env (gitignore) e no
+    Portainer (Environment variables); .env.example versionado.
+  - GET /api/health/ obrigatório (healthcheck do container).
+  - Jobs assíncronos com eventos streamados via Channels; logs em tempo real.
+
+  Convenções: features REQ-FXX-NN / regras RN-FXX-NN; commits convencionais.
+  Porta app 3018 (studio.gwan.cloud). Dev: pg 5451, redis 6398, minio 9018.
+
+  Estado: pipeline F01-F09 implementado (Django Clean Architecture).
+  SDD canônico vive em apps/ffmpeg-colab/docs/spec/ no monorepo gwan-infra
+  (padrão GWAN) — OpenSpec cobre o fluxo de changes, não substitui docs/spec/.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
