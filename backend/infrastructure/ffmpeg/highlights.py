@@ -9,6 +9,8 @@ import os
 import shutil
 import subprocess
 
+from infrastructure.ffmpeg.errors import raise_if_failed
+
 
 def extract_audio_wav(video_path: str, output_wav_path: str) -> None:
     """Extrai áudio mono 16kHz — formato ótimo para análise de energia e Whisper."""
@@ -17,8 +19,7 @@ def extract_audio_wav(video_path: str, output_wav_path: str) -> None:
         ['ffmpeg', '-y', '-i', video_path, '-ac', '1', '-ar', '16000', '-vn', output_wav_path],
         capture_output=True, text=True, timeout=1800,
     )
-    if result.returncode != 0:
-        raise subprocess.CalledProcessError(result.returncode, 'ffmpeg', stderr=result.stderr)
+    raise_if_failed(result)
 
 
 def audio_energy_peaks(wav_path: str, top_n: int = 40) -> list[float]:
@@ -103,8 +104,7 @@ def cut_and_concat(clips: list[tuple[str, float, float]], output_path: str) -> l
                 ],
                 capture_output=True, text=True, timeout=600,
             )
-            if result.returncode != 0:
-                raise subprocess.CalledProcessError(result.returncode, 'ffmpeg', stderr=result.stderr)
+            raise_if_failed(result)
             clip_paths.append(clip_path)
             log_lines.append(f'[OK] Corte {i + 1}/{len(clips)}: {start:.1f}s–{end:.1f}s')
 
@@ -117,8 +117,7 @@ def cut_and_concat(clips: list[tuple[str, float, float]], output_path: str) -> l
             ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_file, '-c', 'copy', output_path],
             capture_output=True, text=True, timeout=1800,
         )
-        if result.returncode != 0:
-            raise subprocess.CalledProcessError(result.returncode, 'ffmpeg', stderr=result.stderr)
+        raise_if_failed(result)
 
         size_mb = os.path.getsize(output_path) / (1024 * 1024) if os.path.exists(output_path) else 0
         log_lines.append(f'[OK] Highlight concluído — {os.path.basename(output_path)} ({size_mb:.1f} MB)')

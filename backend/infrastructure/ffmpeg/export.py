@@ -6,6 +6,8 @@ import os
 import shutil
 import subprocess
 
+from infrastructure.ffmpeg.errors import raise_if_failed
+
 
 RESOLUTION_MAP = {
     'original': None,
@@ -47,10 +49,8 @@ def run_ffmpeg_export(
     cmd.append(output_path)
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
-    log_lines = [l for l in result.stderr.split('\n') if l.strip()]
-    if result.returncode != 0:
-        raise subprocess.CalledProcessError(result.returncode, 'ffmpeg', stderr=result.stderr)
-    return log_lines
+    raise_if_failed(result)
+    return [l for l in result.stderr.split('\n') if l.strip()]
 
 
 def simulate_export(
