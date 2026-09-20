@@ -30,3 +30,6 @@ Thumbs.db
 
 # Arquivos de teste locais (vídeos grandes, nunca versionar)
 arquivos_teste/
+
+# Fixture e screenshots do e2e (gerados pelo FFmpeg/Playwright)
+backend/.e2e/

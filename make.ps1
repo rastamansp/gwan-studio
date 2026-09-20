@@ -66,6 +66,23 @@ switch ($cmd) {
         Pop-Location
     }
 
+    "e2e-setup" {
+        Require-Venv
+        & $VenvPip install -r (Join-Path $Backend "requirements\e2e.txt")
+        & $VenvPython -m playwright install chromium
+        Write-Host "[gwan-studio] E2E pronto. Rode: .\make.ps1 e2e"
+    }
+
+    "e2e" {
+        Require-Venv
+        Push-Location $Backend
+        # Repassa o que vier depois do alvo: --pular-ia, --headed, --exigir-real...
+        & $VenvPython scripts\e2e_pipeline.py @args
+        $rc = $LASTEXITCODE
+        Pop-Location
+        exit $rc
+    }
+
     "health" {
         Require-Venv
         try {
@@ -78,12 +95,19 @@ switch ($cmd) {
     }
 
     default {
-        Write-Host "Uso: .\make.ps1 [setup|install|dev|migrate|youtube-token|health]"
+        # Nada de caracteres fora do ASCII aqui: o Windows PowerShell 5.1 le este
+        # arquivo (UTF-8 sem BOM) como ANSI, e uma seta "->" em UTF-8 termina no
+        # byte 0x92, que em CP1252 e uma aspa simples — ela fechava a string e
+        # quebrava o parser do script inteiro.
+        Write-Host "Uso: .\make.ps1 [setup|install|dev|migrate|youtube-token|health|e2e-setup|e2e]"
         Write-Host "  setup          venv + pip install + .env"
         Write-Host "  install        pip install phase0.txt"
         Write-Host "  migrate        django migrate"
         Write-Host "  dev            sobe servidor real (Claude + FFmpeg + YouTube)"
-        Write-Host "  youtube-token  OAuth one-shot → YOUTUBE_REFRESH_TOKEN"
+        Write-Host "  youtube-token  OAuth one-shot -> YOUTUBE_REFRESH_TOKEN"
         Write-Host "  health         GET /api/health/"
+        Write-Host "  e2e-setup      instala Playwright + Chromium (uma vez)"
+        Write-Host "  e2e            teste end-to-end pelo navegador"
+        Write-Host "                 extras: --pular-ia --exigir-real --headed"
     }
 }

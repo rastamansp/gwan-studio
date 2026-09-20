@@ -119,6 +119,7 @@ O script carrega o `.env.local`, adiciona FFmpeg ao PATH da sessão e verifica a
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
 | `MERGE_SIMULATE` | `true` | Simula merge (copia 1ª fonte) |
+| `HIGHLIGHT_SIMULATE` | `true` | Simula detecção de highlights (picos falsos, sem FFmpeg/librosa/Claude) |
 | `EXPORT_SIMULATE` | `true` | Simula export (copia merged) |
 | `THUMBNAIL_SIMULATE` | `true` | Simula thumbnails (sem Claude Vision) |
 | `SEO_SIMULATE` | `true` | Simula SEO (sem Claude) |
@@ -131,6 +132,52 @@ O script carrega o `.env.local`, adiciona FFmpeg ao PATH da sessão e verifica a
 | `MINIO_ACCESS_KEY` | `""` | MinIO access key |
 | `MINIO_SECRET_KEY` | `""` | MinIO secret key |
 | `MINIO_BUCKET` | `studio` | Bucket de artefatos |
+
+> ⚠️ **O `.env.local` vence a linha de comando.** `manage.py` chama `load_env()`, que
+> carrega `gwan-studio/.env` e depois `backend/.env.local` com `override=True` — ou seja,
+> ele **sobrescreve** variáveis já presentes no ambiente. `HIGHLIGHT_SIMULATE=true python
+> manage.py runserver` não tem efeito nenhum se o `.env.local` disser `false`. Para mudar
+> um modo, edite o arquivo; não passe a variável na frente do comando.
+
+> ⚠️ **Todas as flags `*_SIMULATE` valem `true` por omissão.** Uma flag ausente do
+> `.env.local` não é "modo real": é modo simulado silencioso. O banner do
+> `start-real.ps1` só imprime cinco delas — `HIGHLIGHT_SIMULATE` não aparece lá,
+> então a tela pode dizer "Modos ativos" com a detecção inteira falsa. No modo
+> simulado o "highlight" gerado é uma **cópia do primeiro source**, com timestamps
+> que não têm relação com o áudio.
+
+---
+
+## Teste end-to-end (Playwright)
+
+Percorre o pipeline inteiro pelo navegador — login, criar projeto, upload,
+highlights, export, SEO, thumbnails — clicando como um operador. Nenhuma chamada
+por baixo da UI: se um botão sumir ou parar de habilitar, o teste quebra.
+
+```powershell
+.\make.ps1 e2e-setup              # uma vez: Playwright + Chromium
+.\make.ps1 dev                    # noutro terminal, servidor de pé
+
+.\make.ps1 e2e                    # fluxo completo (chama o Claude)
+.\make.ps1 e2e --pular-ia         # para no export: sem rede, sem custo, ~40s
+.\make.ps1 e2e --exigir-real      # falha se alguma etapa rodar simulada
+.\make.ps1 e2e --headed           # assistir ao navegador
+```
+
+**O fixture é gerado, não versionado.** `scripts/e2e_pipeline.py` monta com FFmpeg
+um vídeo de 24s com três rajadas de áudio em 4–6s, 12–14s e 19–21s; a detecção
+real tem de achar picos ali. Vídeo de verdade levaria minutos por rodada e não
+caberia no repositório. O arquivo fica em `backend/.e2e/` (gitignored) e é
+reaproveitado entre execuções.
+
+**`--exigir-real` existe por causa de um incidente:** o pipeline rodou em modo
+simulado por engano e o resultado parecia legítimo — jobs verdes, log dizendo
+"concluído com sucesso", arquivo gerado. A flag procura a marca `[SIMULADO]` nos
+logs exibidos e falha se encontrar, para que "passou" não possa significar
+"simulou". Falha do teste salva um screenshot em `backend/.e2e/falha.png`.
+
+A etapa **Publicar não é exercitada**: exige OAuth real do YouTube. O teste
+termina conferindo o progresso do pipeline (`5/6`, ou `3/6` com `--pular-ia`).
 
 ---
 

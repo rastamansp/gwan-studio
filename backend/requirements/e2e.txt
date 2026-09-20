@@ -1,0 +1,7 @@
+# Teste end-to-end pelo navegador (scripts/e2e_pipeline.py).
+# Separado de phase0.txt porque nada disto roda em produção.
+#
+# Instalação (uma vez):
+#   .venv\Scripts\pip.exe install -r requirements/e2e.txt
+#   .venv\Scripts\python.exe -m playwright install chromium
+playwright==1.*
